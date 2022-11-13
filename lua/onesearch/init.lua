@@ -12,7 +12,6 @@ function M.setup()
         select = "WarningMsg",
     }
     core.hints = { "l", "a", "k", "s", "j", "d", "o", "w", "e", "p" }
-    print("onesearch setup")
 
     vim.api.nvim_set_hl(0, 'SearcherMulti', { fg = "#7fef00", bold = true })
     vim.api.nvim_set_hl(0, 'SearcherSingle', { fg = "#66ccff", bold = true })
