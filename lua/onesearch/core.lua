@@ -1,15 +1,5 @@
-local api = vim.api
 local M = {}
-
-M.hint_ns = api.nvim_create_namespace("SeacherHints")
-M.background_ns = api.nvim_create_namespace("SeacherBackground")
-M.hl = {
-    overlay = "NonText",
-    multi = "SearcherMulti",
-    single = "SearcherSingle",
-    select = "WarningMsg",
-}
-M.hints = { "l", "a", "k", "s", "j", "d", "o", "w", "e", "p" }
+local api = vim.api
 
 function M.visible_lines()
     local top = vim.fn.line("w0")
@@ -104,9 +94,9 @@ function M.prompt()
 
         if type(key) == 'number' then
             key = vim.fn.nr2char(key)
-        elseif key:byte() == 128 then
-            -- It's a special key in string
-            -- and so what?
+        else
+            api.nvim_echo({ { "Not sure what you pressed, but bruh.", "Error" } }, true, {})
+            return
         end
         if key == K_Esc or key == K_NL then -- reject
             api.nvim_win_set_cursor(0, save_cursor)
@@ -135,13 +125,17 @@ function M.prompt()
 
         local color = (#matches == 1) and "SearcherSingle" or "SearcherMulti"
 
-        -- delete stale extmarks before drawing new ones
-        api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
-        for _, match in ipairs(matches) do
-            api.nvim_buf_set_extmark(0, M.hint_ns, match.line - 1, match.col - 1, {
-                virt_text = { { pat, color } },
-                virt_text_pos = "overlay"
-            })
+        if #matches > 0 then
+            -- delete stale extmarks before drawing new ones
+            api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
+            for _, match in ipairs(matches) do
+                api.nvim_buf_set_extmark(0, M.hint_ns, match.line - 1, match.col - 1, {
+                    virt_text = { { pat, color } },
+                    virt_text_pos = "overlay"
+                })
+            end
+        else
+            api.nvim_win_set_cursor(0, { next.line, next.col - 1 })
         end
     end
 
@@ -151,31 +145,35 @@ function M.prompt()
 
         local targets = {}
 
-        -- remove neon green hints to better see targets
-        api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
-        for i, match in ipairs(matches) do
-            if i < #M.hints then
-                local c = M.hints[i]
-                targets[c] = match
-                api.nvim_buf_set_extmark(0, M.hint_ns, match.line - 1, match.col - 1, {
-                    virt_text = { { c, M.hl.select } },
-                    virt_text_pos = "overlay"
-                })
+        if #matches > 1 then
+
+            -- remove neon green hints to better see targets
+            api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
+            for i, match in ipairs(matches) do
+                if i < #M.hints then
+                    local c = M.hints[i]
+                    targets[c] = match
+                    api.nvim_buf_set_extmark(0, M.hint_ns, match.line - 1, match.col - 1, {
+                        virt_text = { { c, M.hl.select } },
+                        virt_text_pos = "overlay"
+                    })
+                end
             end
-        end
 
-        -- make sure to show the new hints
-        vim.cmd('redraw')
+            -- make sure to show the new hints
+            vim.cmd('redraw')
 
-        local ok, key = pcall(vim.fn.getchar)
-        if ok then
+            local key = vim.fn.getchar()
             if type(key) == 'number' then
                 key = vim.fn.nr2char(key)
+                local selected = targets[key]
+                if selected then
+                    api.nvim_win_set_cursor(0, { selected.line, selected.col - 1 })
+                end
             end
-            local selected = targets[key]
-            if selected then
-                api.nvim_win_set_cursor(0, { selected.line, selected.col - 1})
-            end
+        else
+            local match = matches[1]
+            api.nvim_win_set_cursor(0, { match.line, match.col - 1 })
         end
     end
 
