@@ -19,9 +19,14 @@ function M.visible_lines()
     return { top = top, bot = bot }
 end
 
-function M.search_pos(pattern)
+function M.search_pos(pattern, mode)
     -- NOTE: moves cursor to match! need to save/restore
-    local res = vim.fn.searchpos(pattern)
+    local res
+    if mode then
+        res = vim.fn.searchpos(pattern, mode)
+    else
+        res = vim.fn.searchpos(pattern)
+    end
     return { line = res[1], col = res[2] }
 end
 
@@ -41,12 +46,12 @@ function M.newAutotable(dim)
     return setmetatable({}, MT[1]);
 end
 
-function M.matches_within(str)
+function M.visible_matches(str)
     -- there are 4 options
     --   1. some matches are visible :  #matches >  0 , next != nil
-    --   2. no matches are visible   :  #mathces == 0 , next != nil
-    --   3. all matches are visible  :  #matches >  0 , next == nil
-    --   4. no matches               :  #matches == 0 , next == nil
+    --   2.   no matches are visible :  #mathces == 0 , next != nil
+    --   3.  all matches are visible :  #matches >  0 , next == nil
+    --   4.   no matches             :  #matches == 0 , next == nil
 
     local save_cursor = api.nvim_win_get_cursor(0) -- save location
 
@@ -61,8 +66,16 @@ function M.matches_within(str)
     local seen = M.newAutotable(2);
 
     -- Start searching from first visible line
-    vim.fn.cursor({ visible.top, 1 }) -- cursor is 1-indexed
-    local res = M.search_pos(str) -- forward search, wrapping
+    vim.fn.cursor({ visible.top, 1 })
+
+    -- Storytime: the search() function in vim doesn't accept matches AT
+    -- the cursor position. So when I move to the beginning of the visible
+    -- range I won't detect matches that are right at the beginning.
+    -- The flag "c" lets you accept matches AT cursor position, but that means
+    -- that the cursor doesn't move to new matches.
+    -- To avoid getting stuck in place I only use "c" on the first search
+
+    local res = M.search_pos(str, "c")
     while (res.line > 0 --[[ matches found ]]
         and res.line >= visible.top --[[ match is visible ]]
         and res.line <= visible.bot --[[ match is visible ]]
@@ -101,7 +114,7 @@ end
 
 function M.match_and_show(pat)
     api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
-    local matches, _ = M.matches_within(pat)
+    local matches, _ = M.visible_matches(pat)
     local color = (#matches == 1) and "SearcherSingle" or "SearcherMulti"
     M.show(matches, pat, color)
 end
@@ -153,7 +166,7 @@ function M.search()
 
         -- delete stale extmarks before drawing new ones
         api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
-        matches, next = M.matches_within(pat)
+        matches, next = M.visible_matches(pat)
         color = (#matches == 1) and "SearcherSingle" or "SearcherMulti"
 
         if #matches > 0 then
