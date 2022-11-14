@@ -20,9 +20,14 @@ Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
 
 ## How it works
 
-Onesearch has only one main function `search()`, which dims the text on screen and starts an interactive string search. As you type the matches in the currently visible area are highlighted in green, if there is only a single match the color will change to light blue. Pressing `<Tab>` will move through the files showing groups of matches. Upon pressing `<CR>` the highlight changes to showing single char hints that can be used to jump to the matches. If there is a single match jump immediately.
+Onesearch has only one main function `search()`, which dims the text on screen and starts an interactive string search. As you type the matches in the currently visible area are highlighted in green, if there is only a single match the color will change to light blue. 
 
-See the following diagram:
+Multiple matches           |  Single match             | Hints
+:-------------------------:|:-------------------------:|:-------------------------:
+![](https://raw.githubusercontent.com/lfrati/onesearch.nvim/main/assets/multi.png)   |  ![](https://raw.githubusercontent.com/lfrati/onesearch.nvim/main/assets/single.png) | ![](https://raw.githubusercontent.com/lfrati/onesearch.nvim/main/assets/hints.png) 
+
+Pressing `<Tab>` will loop through groups of matches. Upon pressing `<CR>` the search ends and the jumping begins. The highlight changes to red, showing single char hints that can be used to jump to the matches. If there is only a single match visible it will jump immediately.
+
 ```mermaid
 graph LR
     A(START) -->|overlay| B(read char)
