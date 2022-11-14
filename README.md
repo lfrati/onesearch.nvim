@@ -4,12 +4,10 @@
 </p>
 
 
-# onesearch
-Opinionated and simple.
+# onesearch.nvim
+What is onerseach? Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim).
 
-Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim).
-This pony does one thing and one thing only.
-Interactively searches for a pattern, TABs to cycle through matches and easymotion-ly jumps to one of them with a single char. 
+This pony does one thing and one thing only: interactively searches for a pattern.
 
 ```mermaid
 graph LR
@@ -23,8 +21,16 @@ graph LR
     end
     subgraph marks
         D --> |single|J
-        D --> |multiple|H(read nchar)
+        D --> |multiple|H(read char)
         H --> |char|J(JUMP)
     end
     H --> |ESC|C
+```
+## Installation
+Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+
+```lua
+ use { 'lfrati/onesearch.nvim', config = function()
+        vim.keymap.set("n", "/", ":lua require('onesearch').search()<CR>")
+ end }
 ```
