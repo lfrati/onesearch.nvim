@@ -9,7 +9,7 @@ M.hl = {
     single = "SearcherSingle",
     select = "WarningMsg",
 }
-M.hints = { "l", "a", "k", "s", "j", "d", "o", "w", "e", "p" }
+M.hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 vim.api.nvim_set_hl(0, 'SearcherMulti', { fg = "#7fef00", bold = true })
 vim.api.nvim_set_hl(0, 'SearcherSingle', { fg = "#66ccff", bold = true })
 
@@ -51,6 +51,12 @@ function M.matches_within(str)
     local save_cursor = api.nvim_win_get_cursor(0) -- save location
 
     local visible = M.visible_lines()
+
+    -- hide highlights, make everything grey.
+    for lnum = visible.top - 1, visible.bot - 1 do
+        vim.api.nvim_buf_add_highlight(0, M.background_ns, M.hl.overlay, lnum, 0, -1)
+    end
+
     local matches = {}
     local seen = M.newAutotable(2);
 
@@ -68,7 +74,7 @@ function M.matches_within(str)
     end
 
     api.nvim_win_set_cursor(0, save_cursor) -- restore location
-    return { matches = matches, next = res }
+    return matches, res.col > 0 and res or nil
 end
 
 function M.getkey()
@@ -82,6 +88,22 @@ function M.getkey()
         key = vim.fn.nr2char(key)
     end
     return key
+end
+
+function M.show(matches, pat, color)
+    for _, match in ipairs(matches) do
+        api.nvim_buf_set_extmark(0, M.hint_ns, match.line - 1, match.col - 1, {
+            virt_text = { { pat, color } },
+            virt_text_pos = "overlay"
+        })
+    end
+end
+
+function M.match_and_show(pat)
+    api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
+    local matches, _ = M.matches_within(pat)
+    local color = (#matches == 1) and "SearcherSingle" or "SearcherMulti"
+    M.show(matches, pat, color)
 end
 
 -- from  https://github.com/phaazon/hop.nvim/blob/baa92e09ea2d3085bdf23c00ab378c1f27069f6f/lua/hop/init.lua#L198
@@ -100,15 +122,9 @@ function M.search()
 
     local save_cursor = api.nvim_win_get_cursor(0) -- save location
 
-    -- hide highlights, make everything grey.
-    for lnum = 0, vim.fn.line("$") - 1 do
-        vim.api.nvim_buf_add_highlight(0, M.background_ns, M.hl.overlay, lnum, 0, -1)
-    end
-
     local next = nil
     local accepted = false
-    local matches
-    local key
+    local matches, key, color
 
     while (true) do
         vim.cmd('redraw')
@@ -123,8 +139,7 @@ function M.search()
             accepted = true
             break -- accept
         elseif key == K_TAB then -- next
-            if next and next.line > 0 then
-                print("Moving to")
+            if next then
                 api.nvim_win_set_cursor(0, { next.line, next.col })
                 api.nvim_exec("normal! zt", false)
             end
@@ -136,39 +151,27 @@ function M.search()
 
         pat = vim.fn.join(pat_keys, '')
 
-
-        local results = M.matches_within(pat)
-        matches = results.matches
-        next = results.next
-
-        local color = (#matches == 1) and "SearcherSingle" or "SearcherMulti"
-
         -- delete stale extmarks before drawing new ones
         api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
+        matches, next = M.matches_within(pat)
+        color = (#matches == 1) and "SearcherSingle" or "SearcherMulti"
 
         if #matches > 0 then
-            for _, match in ipairs(matches) do
-                api.nvim_buf_set_extmark(0, M.hint_ns, match.line - 1, match.col - 1, {
-                    virt_text = { { pat, color } },
-                    virt_text_pos = "overlay"
-                })
-            end
+            M.show(matches, pat, color)
         else
             -- if there are matches somewhere else move there
-            if next.line > 0 then
+            if next then
                 api.nvim_win_set_cursor(0, { next.line, next.col - 1 })
+                -- since I know there was a match I need to update the highlight
+                M.match_and_show(pat)
             end
         end
     end
 
     if accepted then
-        -- Don't need to recompute them
-        -- matches = M.matches_within(pat).matches
-
         local targets = {}
 
         if #matches > 1 then
-
             -- remove neon green hints to better see targets
             api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
             for i, match in ipairs(matches) do
@@ -198,11 +201,14 @@ function M.search()
 
     -- Remove extmarks and restore highlighting
     M.clear()
+    vim.cmd('redraw')
 end
 
 function M.clear()
     api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
     api.nvim_buf_clear_namespace(0, M.background_ns, 0, -1)
 end
+
+-- xenomorph
 
 return M
