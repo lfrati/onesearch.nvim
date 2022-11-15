@@ -64,7 +64,7 @@ local function search_pos(pattern, mode)
     return { line = res[1], col = res[2] }
 end
 
-function M.newAutotable(dim)
+local function new_autotable(dim)
     -- https://stackoverflow.com/a/21287623
     -- I need to check I'm not going over the same match multiple times
     -- so I'll use some metatable magic to make a pair -> seen mapping
@@ -80,6 +80,13 @@ function M.newAutotable(dim)
     return setmetatable({}, MT[1]);
 end
 
+local function dim(visible)
+    -- hide highlights, make everything grey.
+    for lnum = visible.top - 1, visible.bot - 1 do
+        vim.api.nvim_buf_add_highlight(0, background_ns, M.conf.hl.overlay, lnum, 0, -1)
+    end
+end
+
 local function visible_matches(str)
     -- there are 4 options
     --   1. some matches are visible :  #matches >  0 , next != nil
@@ -91,13 +98,10 @@ local function visible_matches(str)
 
     local visible = visible_lines()
 
-    -- hide highlights, make everything grey.
-    for lnum = visible.top - 1, visible.bot - 1 do
-        vim.api.nvim_buf_add_highlight(0, background_ns, M.conf.hl.overlay, lnum, 0, -1)
-    end
+    dim(visible)
 
     local matches = {}
-    local seen = M.newAutotable(2);
+    local seen = new_autotable(2);
 
     -- Start searching from first visible line
     vim.fn.cursor({ visible.top, 1 })
@@ -231,6 +235,9 @@ function M._search()
     local matches, key
 
     while (true) do
+
+        dim(visible_lines())
+
         vim.cmd('redraw')
         api.nvim_echo({ { prompt, 'Question' }, { pat } }, false, {})
 
