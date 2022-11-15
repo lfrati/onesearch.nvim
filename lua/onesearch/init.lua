@@ -249,6 +249,9 @@ function M._search()
                 api.nvim_exec("normal! zt", false)
             end
         elseif key == K_BS then -- decrease
+            if #pat_keys == 0 then
+                return
+            end
             pat_keys[#pat_keys] = nil
         else -- increase
             pat_keys[#pat_keys + 1] = key
@@ -264,7 +267,6 @@ function M._search()
         end
 
     end
-
 
     if #matches == 1 then
         local match = matches[1]
