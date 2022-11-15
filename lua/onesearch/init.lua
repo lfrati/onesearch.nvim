@@ -1,7 +1,7 @@
 local M = {}
 
 --------------------------------------------------------------------------------
--- Local stuff
+-- CONF
 --------------------------------------------------------------------------------
 
 local api = vim.api
@@ -12,6 +12,11 @@ local background_ns = vim.api.nvim_create_namespace("OnesearchBackground")
 local flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
 vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
 vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#66ccff", bold = true })
+
+
+--------------------------------------------------------------------------------
+-- UTILS
+--------------------------------------------------------------------------------
 
 -- from :help uv.new_timer()
 local function set_timeout(timeout, callback)
@@ -29,39 +34,21 @@ local function lpad(str, len, char)
     return str .. string.rep(char or " ", len - #str)
 end
 
-local function flash(lnum)
-    -- I sometimes mistype the jump location and I have then to look for
-    -- where my cursor went. I'm gonna make the landing line flash to
-    -- help me find it more easily.
+local function get_whole_line(lnum)
     local winwidth = vim.fn.winwidth(0)
     local line = vim.fn.getline(lnum)
     local mask = lpad(line, winwidth, " ")
-    local flash_id = api.nvim_buf_set_extmark(0, flash_ns, lnum - 1, 0, {
-        virt_text = { { mask, M.conf.hl.flash } },
-        virt_text_pos = "overlay",
-    })
-    set_timeout(
-        M.conf.flash_t,
-        vim.schedule_wrap(function()
-            api.nvim_buf_del_extmark(0, flash_ns, flash_id)
-        end))
+    return mask
+end
+
+local function get_cursor_line()
+    return api.nvim_win_get_cursor(0)[1]
 end
 
 local function visible_lines()
     local top = vim.fn.line("w0")
     local bot = vim.fn.line("w$")
     return { top = top, bot = bot }
-end
-
-local function search_pos(pattern, mode)
-    -- NOTE: moves cursor to match! need to save/restore
-    local res
-    if mode then
-        res = vim.fn.searchpos(pattern, mode)
-    else
-        res = vim.fn.searchpos(pattern)
-    end
-    return { line = res[1], col = res[2] }
 end
 
 local function new_autotable(dim)
@@ -78,6 +65,53 @@ local function new_autotable(dim)
         end }
     end
     return setmetatable({}, MT[1]);
+end
+
+--------------------------------------------------------------------------------
+-- LOCAL STUFF
+--------------------------------------------------------------------------------
+
+local function flash_line(lnum)
+    -- I sometimes mistype the jump location and I have then to look for
+    -- where my cursor went. I'm gonna make the landing line flash to
+    -- help me find it more easily.
+    local mask = get_whole_line(lnum)
+    local flash_id = api.nvim_buf_set_extmark(0, flash_ns, lnum - 1, 0, {
+        virt_text = { { mask, M.conf.hl.flash } },
+        virt_text_pos = "overlay",
+    })
+    set_timeout(
+        M.conf.flash_t,
+        vim.schedule_wrap(function()
+            api.nvim_buf_del_extmark(0, flash_ns, flash_id)
+            vim.cmd('redraw')
+        end))
+end
+
+local function flash_error()
+    local lnum = get_cursor_line()
+    local mask = get_whole_line()
+    local flash_id = api.nvim_buf_set_extmark(0, flash_ns, lnum - 1, 0, {
+        virt_text = { { mask, "NvimInternalError" } },
+        virt_text_pos = "overlay",
+    })
+    set_timeout(
+        50,
+        vim.schedule_wrap(function()
+            api.nvim_buf_del_extmark(0, flash_ns, flash_id)
+            vim.cmd('redraw')
+        end))
+end
+
+local function search_pos(pattern, mode)
+    -- NOTE: moves cursor to match! need to save/restore
+    local res
+    if mode then
+        res = vim.fn.searchpos(pattern, mode)
+    else
+        res = vim.fn.searchpos(pattern)
+    end
+    return { line = res[1], col = res[2] }
 end
 
 local function dim(visible)
@@ -97,7 +131,6 @@ local function visible_matches(str)
     local save_cursor = api.nvim_win_get_cursor(0) -- save location
 
     local visible = visible_lines()
-
     dim(visible)
 
     local matches = {}
@@ -162,13 +195,13 @@ local function select_hint(targets)
     if selected then
         api.nvim_win_set_cursor(0, { selected.line, selected.col - 1 })
         if M.conf.flash_t > 0 then
-            flash(selected.line)
+            flash_line(selected.line)
         end
     end
 end
 
 --------------------------------------------------------------------------------
--- Exported stuff
+-- EXPORTED STUFF
 --------------------------------------------------------------------------------
 
 M.conf = {
@@ -273,13 +306,18 @@ function M._search()
             matches, next = match_and_show(pat)
         end
 
+        if #matches == 0 and not next then
+            flash_error()
+            vim.cmd('redraw')
+        end
+
     end
 
     if #matches == 1 then
         local match = matches[1]
         api.nvim_win_set_cursor(0, { match.line, match.col - 1 })
         if M.conf.flash_t > 0 then
-            flash(match.line)
+            flash_line(match.line)
         end
         return
     end
