@@ -92,11 +92,11 @@ local function flash_error()
     local lnum = get_cursor_line()
     local mask = get_whole_line()
     local flash_id = api.nvim_buf_set_extmark(0, flash_ns, lnum - 1, 0, {
-        virt_text = { { mask, "NvimInternalError" } },
+        virt_text = { { mask, M.conf.hl.error } },
         virt_text_pos = "overlay",
     })
     set_timeout(
-        50,
+        M.conf.error_t,
         vim.schedule_wrap(function()
             api.nvim_buf_del_extmark(0, flash_ns, flash_id)
             vim.cmd('redraw')
@@ -206,13 +206,19 @@ end
 
 M.conf = {
     flash_t = 150,
+    error_t = 50,
     hl = {
         overlay = "NonText",
         multi = "OnesearchMulti",
         single = "OnesearchSingle",
         select = "WarningMsg",
         flash = "Search",
+        error = "NvimInternalError",
+        prompt_empty = "Todo",
+        prompt_matches = "Question",
+        prompt_nomatch = "ErrorMsg",
     },
+    prompt = ">>> Search: ",
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
 
@@ -250,7 +256,6 @@ end
 
 function M._search()
 
-    local prompt = "Search: "
     local K_Esc = api.nvim_replace_termcodes('<Esc>', true, false, true) -- you know who I am
     local K_BS = api.nvim_replace_termcodes('<BS>', true, false, true) -- normal delete
     local K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
@@ -272,7 +277,15 @@ function M._search()
         dim(visible_lines())
 
         vim.cmd('redraw')
-        api.nvim_echo({ { prompt, 'Question' }, { pat } }, false, {})
+
+        local color = M.conf.hl.prompt_empty
+        if #pat_keys > 0 then
+            color = M.conf.hl.prompt_matches
+        end
+        if #pat_keys > 0 and #matches == 0 then
+            color = M.conf.hl.prompt_nomatch
+        end
+        api.nvim_echo({ { M.conf.prompt, color }, { pat } }, false, {})
 
         key = getkey()
 
