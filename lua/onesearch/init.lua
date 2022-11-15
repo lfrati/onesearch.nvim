@@ -1,17 +1,63 @@
 local M = {}
 local api = vim.api
+local uv = vim.loop
 
-M.hint_ns = vim.api.nvim_create_namespace("SeacherHints")
-M.background_ns = vim.api.nvim_create_namespace("SeacherBackground")
-M.hl = {
-    overlay = "NonText",
-    multi = "SearcherMulti",
-    single = "SearcherSingle",
-    select = "WarningMsg",
+
+function M.setup(user_conf)
+    M.conf = vim.tbl_deep_extend("force", M.conf, user_conf)
+end
+
+M.conf = {
+    flash_t = 200,
+    hl = {
+        overlay = "NonText",
+        multi = "OnesearchMulti",
+        single = "OnesearchSingle",
+        select = "WarningMsg",
+        flash = "Search",
+    },
+    hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
-M.hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
-vim.api.nvim_set_hl(0, 'SearcherMulti', { fg = "#7fef00", bold = true })
-vim.api.nvim_set_hl(0, 'SearcherSingle', { fg = "#66ccff", bold = true })
+
+M.hint_ns = vim.api.nvim_create_namespace("OnesearchHints")
+M.background_ns = vim.api.nvim_create_namespace("OnesearchBackground")
+M.flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
+vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
+vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#66ccff", bold = true })
+
+-- from :help uv.new_timer()
+function SetTimeout(timeout, callback)
+    local timer = uv.new_timer()
+    timer:start(timeout, 0, function()
+        timer:stop()
+        timer:close()
+        callback()
+    end)
+    return timer
+end
+
+-- is this seriously not a default string method?
+function M.lpad(str, len, char)
+    return str .. string.rep(char or " ", len - #str)
+end
+
+function M.flash(lnum)
+    -- I sometimes mistype the jump location and I have then to look for
+    -- where my cursor went. I'm gonna make the landing line flash to
+    -- help me find it more easily.
+    local winwidth = vim.fn.winwidth(0)
+    local line = vim.fn.getline(lnum)
+    local mask = M.lpad(line, winwidth, " ")
+    local flash_id = api.nvim_buf_set_extmark(0, M.flash_ns, lnum - 1, 0, {
+        virt_text = { { mask, M.conf.hl.flash } },
+        virt_text_pos = "overlay",
+    })
+    SetTimeout(
+        M.conf.flash_t,
+        vim.schedule_wrap(function()
+            api.nvim_buf_del_extmark(0, M.flash_ns, flash_id)
+        end))
+end
 
 function M.visible_lines()
     local top = vim.fn.line("w0")
@@ -59,7 +105,7 @@ function M.visible_matches(str)
 
     -- hide highlights, make everything grey.
     for lnum = visible.top - 1, visible.bot - 1 do
-        vim.api.nvim_buf_add_highlight(0, M.background_ns, M.hl.overlay, lnum, 0, -1)
+        vim.api.nvim_buf_add_highlight(0, M.background_ns, M.conf.hl.overlay, lnum, 0, -1)
     end
 
     local matches = {}
@@ -115,7 +161,7 @@ end
 function M.match_and_show(pat)
     api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
     local matches, _ = M.visible_matches(pat)
-    local color = (#matches == 1) and "SearcherSingle" or "SearcherMulti"
+    local color = (#matches == 1) and "OnesearchSingle" or "OnesearchMulti"
     M.show(matches, pat, color)
 end
 
@@ -167,7 +213,7 @@ function M.search()
         -- delete stale extmarks before drawing new ones
         api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
         matches, next = M.visible_matches(pat)
-        color = (#matches == 1) and "SearcherSingle" or "SearcherMulti"
+        color = (#matches == 1) and "OnesearchSingle" or "OnesearchMulti"
 
         if #matches > 0 then
             M.show(matches, pat, color)
@@ -188,11 +234,11 @@ function M.search()
             -- remove neon green hints to better see targets
             api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
             for i, match in ipairs(matches) do
-                if i < #M.hints then
-                    local c = M.hints[i]
+                if i < #M.conf.hints then
+                    local c = M.conf.hints[i]
                     targets[c] = match
                     api.nvim_buf_set_extmark(0, M.hint_ns, match.line - 1, match.col - 1, {
-                        virt_text = { { c, M.hl.select } },
+                        virt_text = { { c, M.conf.hl.select } },
                         virt_text_pos = "overlay"
                     })
                 end
@@ -205,10 +251,16 @@ function M.search()
             local selected = targets[key]
             if selected then
                 api.nvim_win_set_cursor(0, { selected.line, selected.col - 1 })
+                if M.conf.flash_t > 0 then
+                    M.flash(selected.line)
+                end
             end
         else
             local match = matches[1]
             api.nvim_win_set_cursor(0, { match.line, match.col - 1 })
+            if M.conf.flash_t > 0 then
+                M.flash(match.line)
+            end
         end
     end
 
@@ -220,8 +272,7 @@ end
 function M.clear()
     api.nvim_buf_clear_namespace(0, M.hint_ns, 0, -1)
     api.nvim_buf_clear_namespace(0, M.background_ns, 0, -1)
+    -- api.nvim_buf_clear_namespace(0, M.flash_ns, 0, -1)
 end
-
--- xenomorph
 
 return M
