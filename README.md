@@ -5,7 +5,7 @@
 
 
 # onesearch.nvim
-What is onerseach? Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim).
+What is onesearch? Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim).
 
 This pony does one thing and one thing only: interactively searches for a pattern.
 
