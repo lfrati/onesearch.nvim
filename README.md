@@ -45,4 +45,20 @@ graph LR
     end
     H --> |ESC|C
 ```
+## Configuration
+The default settings are already perfect, why would you change them?
 
+But if you really want to just override the following defaults:
+```lua
+require("onesearch").setup{
+    flash_t = 200,                    -- how long it flashes for, set to 0 for no flash
+    hl = {
+        overlay = "NonText",          -- highlight for the background during search
+        multi = "OnesearchMulti",     -- highlight for multiple matches
+        single = "OnesearchSingle",   -- highlight for single match
+        select = "WarningMsg",        -- highlight for hints during target selection
+        flash = "Search",             -- highlight for landing flash
+    },
+    hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
+}
+```
