@@ -1,5 +1,6 @@
 local M = {}
 
+
 --------------------------------------------------------------------------------
 -- CONF
 --------------------------------------------------------------------------------
@@ -224,12 +225,14 @@ end
 
 -- from  https://github.com/phaazon/hop.nvim/blob/baa92e09ea2d3085bdf23c00ab378c1f27069f6f/lua/hop/init.lua#98
 function M.search()
-
+    local old_cursor = vim.o.guicursor
+    vim.o.guicursor = "n:ver100"
     M._search()
     -- Remove extmarks and restore highlighting
     M.clear()
     vim.cmd('redraw')
     api.nvim_echo({ { "", 'Normal' } }, false, {})
+    vim.o.guicursor = old_cursor
 end
 
 local function show_hints(matches)
@@ -314,8 +317,9 @@ function M._search()
         if #pattern > 0 and #matches == 0 then
             color = M.conf.hl.prompt_nomatch
         end
-        api.nvim_echo({ { M.conf.prompt, color }, { pattern } }, false, {})
+
         vim.cmd('redraw')
+        api.nvim_echo({ { M.conf.prompt, color }, { pattern, "Normal" } }, false, {})
 
     end
 
@@ -349,6 +353,7 @@ function M._search()
 end
 
 function M.clear()
+
     api.nvim_buf_clear_namespace(0, hint_ns, 0, -1)
     api.nvim_buf_clear_namespace(0, background_ns, 0, -1)
 end
