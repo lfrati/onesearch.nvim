@@ -76,9 +76,10 @@ You can delete the red character to resume searching. Also when a target is chos
 ![example](https://user-images.githubusercontent.com/3115640/202076941-2c018dc6-33a8-4001-9f99-c402a6ba099c.gif)
 
 ## Configuration
-The default settings are already perfect, why would you change them?
-
-But if you really want to just override the following defaults:
+What can I change?
+- Don't like the default colors? Pick your own. 
+- Don't want flashes? Set flash_t to zero.
+- Don't like the chars used for hints? Provide your own[^1].
 ```lua
 require("onesearch").setup{
     flash_t = 150,                    -- how long flash lasts upon landing, set to 0 for no flash
@@ -97,3 +98,4 @@ require("onesearch").setup{
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
 ```
+[^1]: Hints are applied top-to-bottom, beacuse when you tab around your cursor is set to the top one. There are 18 default chars. Too few? Refine your search more!
