@@ -220,7 +220,7 @@ M.conf = {
 M.last_search = ""
 
 function M.setup(user_conf)
-    M.conf = vim.tbl_deep_extend("force", M.conf, user_conf)
+    M.conf = vim.tbl_deep_extend("force", M.conf, user_conf or {})
 end
 
 -- from  https://github.com/phaazon/hop.nvim/blob/baa92e09ea2d3085bdf23c00ab378c1f27069f6f/lua/hop/init.lua#98
