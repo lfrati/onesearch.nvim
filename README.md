@@ -63,14 +63,13 @@ But if you really want to just override the following defaults:
 ```lua
 require("onesearch").setup{
     flash_t = 150,                    -- how long flash lasts upon landing, set to 0 for no flash
-    error_t = 50,                     -- how long flash lasts when no matches
     hl = {
         overlay = "NonText",          -- highlight for the background during search
         multi = "OnesearchMulti",     -- highlight for multiple matches
         single = "OnesearchSingle",   -- highlight for single match
         select = "WarningMsg",        -- highlight for hints during target selection
         flash = "Search",             -- highlight for landing flash
-        error = "NvimInternalError",  -- highlight for no-matches flash
+        error = "WarningMsg",         -- highlight for no-matches flash
         prompt_empty = "Todo",        -- highlight for prompt upon empty search pattern
         prompt_matches = "Question",  -- highlight for default prompt
         prompt_nomatch = "ErrorMsg",  -- highlight for non-matching prompt
