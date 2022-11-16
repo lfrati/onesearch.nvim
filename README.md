@@ -5,9 +5,13 @@
 
 
 # onesearch.nvim
-What is onesearch? Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim).
+What is onesearch? Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim). This pony does one thing and one thing only: interactively searches for a pattern.
 
-This pony does one thing and one thing only: interactively searches for a pattern.
+## Why onesearch.nvim?
+Ever since I discovered plugins like [easymotion](https://github.com/easymotion/vim-easymotion) I've been in love with moving around selecting single char targets. With the advent of lua several new search plugins have appeared but despite their extensive configurability I couldn't get them to fit my specific use case. In particular I wanted to:
+- highlight visible matches and use TAB to look for more matches outside the visible range
+- show that there is a single match so that I don't have to scan the screen looking for more, and jump to it when I press CR
+- help me recover from mistakes: show me the last valid match when I mistype and show me where I land so I don't lose track of the cursor
 
 ## Installation
 Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
