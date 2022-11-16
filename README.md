@@ -46,6 +46,16 @@ graph TD
     end
     H --> |ESC|C
 ```
+While searching for a pattern, errors (i.e. chars that lead to no matches) are shown in red.
+
+Multiple matches  + errors         |  Single match   + errors           
+:-------------------------:|:-------------------------:
+<img width="345" alt="multi_error" src="https://user-images.githubusercontent.com/3115640/202078577-67a9b404-f8d8-4342-9887-d7d478fd9897.png"> | <img width="343" alt="single_error" src="https://user-images.githubusercontent.com/3115640/202078587-d319ad84-915d-46a8-9308-96a793d68e93.png">
+
+You can delete the red character to resume searching. Also when a target is chosen the corresponding line flashes briefly. This is helpful in case of typos while selecting the target because it avoids losing track of the cursor.
+
+![example](https://user-images.githubusercontent.com/3115640/202076941-2c018dc6-33a8-4001-9f99-c402a6ba099c.gif)
+
 ## Configuration
 The default settings are already perfect, why would you change them?
 
