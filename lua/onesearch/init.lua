@@ -152,6 +152,7 @@ local function getkey()
     if type(key) == 'number' then
         key = vim.fn.nr2char(key)
     end
+
     return key
 
 end
@@ -196,7 +197,7 @@ M.conf = {
     flash_t = 150,
     error_t = 50,
     hl = {
-        overlay = "NonText",
+        overlay = "LineNr",
         multi = "OnesearchMulti",
         single = "OnesearchSingle",
         select = "WarningMsg",
@@ -209,7 +210,8 @@ M.conf = {
     prompt = ">>> Search: ",
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
-
+M.last_search = ""
+M.last_search_longestmatch = 0
 
 function M.setup(user_conf)
     M.conf = vim.tbl_deep_extend("force", M.conf, user_conf)
@@ -245,41 +247,30 @@ end
 function M._search()
 
     local K_Esc = api.nvim_replace_termcodes('<Esc>', true, false, true) -- you know who I am
-    local K_BS = api.nvim_replace_termcodes('<BS>', true, false, true) -- normal delete
+    local K_BS = api.nvim_replace_termcodes('<BS>', true, false, true) -- backspace
     local K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
     local K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
-    local pat_keys = {}
     local pattern = ''
-
-    -- TODO: Do I need/want to deal with this stuff?
-    -- local K_C_H = api.nvim_replace_termcodes('<C-H>', true, false, true) -- weird delete?
-    -- local K_N= api.nvim_replace_termcodes('<N', true, false, true) -- <C-J>? dafuq?
 
     local save_cursor = api.nvim_win_get_cursor(0) -- save location
 
     local next = nil
-    local matches, key, lastmatch
+    local matches, key, longestmatch
 
+    api.nvim_echo({ { M.conf.prompt, M.conf.hl.prompt_empty }, { pattern } }, false, {})
     while (true) do
 
         dim(visible_lines())
-
         vim.cmd('redraw')
-
-        local color = M.conf.hl.prompt_empty
-        if #pat_keys > 0 then
-            color = M.conf.hl.prompt_matches
-        end
-        if #pat_keys > 0 and #matches == 0 then
-            color = M.conf.hl.prompt_nomatch
-        end
-        api.nvim_echo({ { M.conf.prompt, color }, { pattern } }, false, {})
 
         key = getkey()
 
         if not key then return end
 
-        if key == K_Esc then -- reject
+        if key == "\x80ku" then -- UP arrow
+            pattern = M.last_search
+            longestmatch = M.last_search_longestmatch
+        elseif key == K_Esc then -- reject
             api.nvim_win_set_cursor(0, save_cursor)
             return
         elseif key == K_CR then
@@ -290,15 +281,13 @@ function M._search()
                 api.nvim_exec("normal! zt", false)
             end
         elseif key == K_BS then -- decrease
-            if #pat_keys == 0 then
+            if #pattern == 0 then -- delete on empty pattern exits
                 return
             end
-            pat_keys[#pat_keys] = nil
+            pattern = pattern:sub(1, -2)
         else -- increase
-            pat_keys[#pat_keys + 1] = key
+            pattern = pattern .. key
         end
-
-        pattern = vim.fn.join(pat_keys, '')
 
         matches, next = match_and_show(pattern)
 
@@ -308,17 +297,35 @@ function M._search()
         end
 
         if #matches > 0 then
-            lastmatch = #pattern
+            longestmatch = #pattern
         end
 
         if M.conf.error_t > 0 and #matches == 0 and not next then
-            match_and_show(pattern:sub(0, lastmatch), pattern:sub(lastmatch + 1))
+            match_and_show(pattern:sub(0, longestmatch), pattern:sub(longestmatch + 1))
             vim.cmd('redraw')
         end
 
+        local color = M.conf.hl.prompt_empty
+        if #pattern > 0 then
+            color = M.conf.hl.prompt_matches
+        end
+        if #pattern > 0 and #matches == 0 then
+            color = M.conf.hl.prompt_nomatch
+        end
+        api.nvim_echo({ { M.conf.prompt, color }, { pattern } }, false, {})
+        vim.cmd('redraw')
+
     end
 
+    if #matches == 0 then
+        return
+    end
+
+    -- save search information for "n" compatibility and
+    -- arrow up replay
     vim.fn.setreg("/", pattern)
+    M.last_search = pattern
+    M.last_search_longestmatch = longestmatch
 
     if #matches == 1 then
         local match = matches[1]
@@ -334,6 +341,7 @@ function M._search()
         -- make sure to show the new hints
         vim.cmd('redraw')
         select_hint(targets)
+        return
     end
 end
 
