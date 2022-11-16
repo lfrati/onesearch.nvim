@@ -24,7 +24,7 @@ Onesearch has only one main function `search()`, which dims the text on screen a
 
 Multiple matches           |  Single match             | Hints
 :-------------------------:|:-------------------------:|:-------------------------:
-![](https://raw.githubusercontent.com/lfrati/onesearch.nvim/main/assets/multi.png)   |  ![](https://raw.githubusercontent.com/lfrati/onesearch.nvim/main/assets/single.png) | ![](https://raw.githubusercontent.com/lfrati/onesearch.nvim/main/assets/hints.png) 
+<img width="310" alt="multi" src="https://user-images.githubusercontent.com/3115640/202079543-4f9ef5dd-ca3e-446e-84ef-9cf631163b22.png">   |  <img width="310" alt="single" src="https://user-images.githubusercontent.com/3115640/202079561-9bd3602f-2f17-4da1-8d8f-83120a104738.png"> | <img width="310" alt="hints" src="https://user-images.githubusercontent.com/3115640/202079575-927ebb48-8078-4973-8725-cb8be48898d2.png"> 
 
 Pressing `<Tab>` will loop through groups of matches. Upon pressing `<CR>` the search ends and the jumping begins. The highlight changes to red, showing single char hints that can be used to jump to the matches. If there is only a single match visible it will jump immediately.
 
