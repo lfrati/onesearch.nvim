@@ -13,7 +13,6 @@ local flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
 vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
 vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#66ccff", bold = true })
 
-
 --------------------------------------------------------------------------------
 -- UTILS
 --------------------------------------------------------------------------------
@@ -41,14 +40,11 @@ local function get_whole_line(lnum)
     return mask
 end
 
-local function get_cursor_line()
-    return api.nvim_win_get_cursor(0)[1]
-end
-
 local function visible_lines()
-    local top = vim.fn.line("w0")
-    local bot = vim.fn.line("w$")
-    return { top = top, bot = bot }
+    return {
+        top = vim.fn.line("w0"),
+        bot = vim.fn.line("w$")
+    }
 end
 
 local function new_autotable(dim)
@@ -82,21 +78,6 @@ local function flash_line(lnum)
     })
     set_timeout(
         M.conf.flash_t,
-        vim.schedule_wrap(function()
-            api.nvim_buf_del_extmark(0, flash_ns, flash_id)
-            vim.cmd('redraw')
-        end))
-end
-
-local function flash_error()
-    local lnum = get_cursor_line()
-    local mask = get_whole_line()
-    local flash_id = api.nvim_buf_set_extmark(0, flash_ns, lnum - 1, 0, {
-        virt_text = { { mask, M.conf.hl.error } },
-        virt_text_pos = "overlay",
-    })
-    set_timeout(
-        M.conf.error_t,
         vim.schedule_wrap(function()
             api.nvim_buf_del_extmark(0, flash_ns, flash_id)
             vim.cmd('redraw')
@@ -175,7 +156,7 @@ local function getkey()
 
 end
 
-local function match_and_show(pat)
+local function match_and_show(pat, cnt)
     -- delete stale extmarks before drawing new ones
     api.nvim_buf_clear_namespace(0, hint_ns, 0, -1)
     local matches, next = visible_matches(pat)
@@ -185,6 +166,13 @@ local function match_and_show(pat)
             virt_text = { { pat, color } },
             virt_text_pos = "overlay"
         })
+
+        if cnt then
+            api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1 + #pat, {
+                virt_text = { { cnt, M.conf.hl.error } },
+                virt_text_pos = "overlay"
+            })
+        end
     end
     return matches, next
 end
@@ -213,7 +201,7 @@ M.conf = {
         single = "OnesearchSingle",
         select = "WarningMsg",
         flash = "Search",
-        error = "NvimInternalError",
+        error = "WarningMsg",
         prompt_empty = "Todo",
         prompt_matches = "Question",
         prompt_nomatch = "ErrorMsg",
@@ -261,7 +249,7 @@ function M._search()
     local K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
     local K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
     local pat_keys = {}
-    local pat = ''
+    local pattern = ''
 
     -- TODO: Do I need/want to deal with this stuff?
     -- local K_C_H = api.nvim_replace_termcodes('<C-H>', true, false, true) -- weird delete?
@@ -270,7 +258,7 @@ function M._search()
     local save_cursor = api.nvim_win_get_cursor(0) -- save location
 
     local next = nil
-    local matches, key
+    local matches, key, lastmatch
 
     while (true) do
 
@@ -285,7 +273,7 @@ function M._search()
         if #pat_keys > 0 and #matches == 0 then
             color = M.conf.hl.prompt_nomatch
         end
-        api.nvim_echo({ { M.conf.prompt, color }, { pat } }, false, {})
+        api.nvim_echo({ { M.conf.prompt, color }, { pattern } }, false, {})
 
         key = getkey()
 
@@ -310,21 +298,27 @@ function M._search()
             pat_keys[#pat_keys + 1] = key
         end
 
-        pat = vim.fn.join(pat_keys, '')
+        pattern = vim.fn.join(pat_keys, '')
 
-        matches, next = match_and_show(pat)
+        matches, next = match_and_show(pattern)
 
         if #matches == 0 and next then
             api.nvim_win_set_cursor(0, { next.line, next.col - 1 })
-            matches, next = match_and_show(pat)
+            matches, next = match_and_show(pattern)
         end
 
-        if #matches == 0 and not next then
-            flash_error()
+        if #matches > 0 then
+            lastmatch = #pattern
+        end
+
+        if M.conf.error_t > 0 and #matches == 0 and not next then
+            match_and_show(pattern:sub(0, lastmatch), pattern:sub(lastmatch + 1))
             vim.cmd('redraw')
         end
 
     end
+
+    vim.fn.setreg("/", pattern)
 
     if #matches == 1 then
         local match = matches[1]
