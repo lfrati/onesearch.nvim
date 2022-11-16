@@ -195,7 +195,6 @@ end
 
 M.conf = {
     flash_t = 150,
-    error_t = 50,
     hl = {
         overlay = "LineNr",
         multi = "OnesearchMulti",
@@ -300,7 +299,7 @@ function M._search()
             longestmatch = #pattern
         end
 
-        if M.conf.error_t > 0 and #matches == 0 and not next then
+        if #matches == 0 and not next then
             match_and_show(pattern:sub(0, longestmatch), pattern:sub(longestmatch + 1))
             vim.cmd('redraw')
         end
