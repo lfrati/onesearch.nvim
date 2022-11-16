@@ -10,8 +10,14 @@ local uv = vim.loop
 local hint_ns = vim.api.nvim_create_namespace("OnesearchHints")
 local background_ns = vim.api.nvim_create_namespace("OnesearchBackground")
 local flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
-vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
-vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#66ccff", bold = true })
+
+if vim.o.termguicolors == true then -- fun gui colors :)
+    vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#66ccff", bold = true })
+else -- boring default colors :(
+    vim.api.nvim_set_hl(0, 'OnesearchMulti', { link = "Search" })
+    vim.api.nvim_set_hl(0, 'OnesearchSingle', { link = "IncSearch" })
+end
 
 --------------------------------------------------------------------------------
 -- UTILS
