@@ -5,16 +5,31 @@
 
 
 # onesearch.nvim
-What is onesearch? Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim). This pony does one thing and one thing only: interactively searches for a pattern.
+> What is onesearch? Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim). This pony does one thing and one thing only: interactively searches for a pattern.
 
 ## Why onesearch.nvim?
-Ever since I discovered plugins like [easymotion](https://github.com/easymotion/vim-easymotion) I've been in love with moving around selecting single char targets. With the advent of lua several new search plugins have appeared but despite their extensive configurability I couldn't get them to fit my specific use case. In particular I wanted to:
+Ever since I discovered plugins like [easymotion](https://github.com/easymotion/vim-easymotion) I've been in love with moving around selecting single char targets. With the advent of lua several new search plugins have appeared but despite their extensive configurability I couldn't get them to fit my specific use case. In particular I wanted it to:
 - highlight visible matches and use TAB to look for more matches outside the visible range
-- show that there is a single match so that I don't have to scan the screen looking for more, and jump to it when I press CR
-- help me recover from mistakes: show me the last valid match when I mistype and show me where I land so I don't lose track of the cursor
+- visually show that there is a single match so that I don't have to scan the screen looking for more, and jump to it when I press CR
+- accept that I make mistakes and help me recover from them: show me the last valid match while I search and show me where I land so I don't lose track of the cursor when I mistype the target char
 
 ## Installation
-Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+
+Using [vim-plug](https://github.com/junegunn/vim-plug)
+
+```viml
+Plug 'lfrati/onesearch.nvim'
+  nmap / :lua require('onesearch').search()<CR>
+```
+
+Using [dein](https://github.com/Shougo/dein.vim)
+
+```viml
+call dein#add('lfrati/onesearch.nvim')
+  nmap / :lua require('onesearch').search()<CR>
+```
+
+Using [packer](https://github.com/wbthomason/packer.nvim)
 
 ```lua
  use { 'lfrati/onesearch.nvim', config = function()
