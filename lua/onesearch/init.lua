@@ -170,7 +170,8 @@ local function match_and_show(pat, cnt)
 
         if cnt then
             api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1 + #pat, {
-                virt_text = { { cnt, M.conf.hl.error } },
+                -- replace " " with "_" so that we see it better, space has no color >_>
+                virt_text = { { cnt:gsub(" ","_"), M.conf.hl.error } },
                 virt_text_pos = "overlay"
             })
         end
