@@ -171,7 +171,7 @@ local function match_and_show(pat, cnt)
         if cnt then
             api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1 + #pat, {
                 -- replace " " with "_" so that we see it better, space has no color >_>
-                virt_text = { { cnt:gsub(" ","_"), M.conf.hl.error } },
+                virt_text = { { cnt:gsub(" ", "_"), M.conf.hl.error } },
                 virt_text_pos = "overlay"
             })
         end
@@ -211,7 +211,6 @@ M.conf = {
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
 M.last_search = ""
-M.last_search_longestmatch = 0
 
 function M.setup(user_conf)
     M.conf = vim.tbl_deep_extend("force", M.conf, user_conf)
@@ -255,7 +254,7 @@ function M._search()
     local save_cursor = api.nvim_win_get_cursor(0) -- save location
 
     local next = nil
-    local matches, key, longestmatch
+    local matches, key, last_match
 
     api.nvim_echo({ { M.conf.prompt, M.conf.hl.prompt_empty }, { pattern } }, false, {})
     while (true) do
@@ -267,10 +266,7 @@ function M._search()
 
         if not key then return end
 
-        if key == "\x80ku" then -- UP arrow
-            pattern = M.last_search
-            longestmatch = M.last_search_longestmatch
-        elseif key == K_Esc then -- reject
+        if key == K_Esc then -- reject
             api.nvim_win_set_cursor(0, save_cursor)
             return
         elseif key == K_CR then
@@ -297,11 +293,11 @@ function M._search()
         end
 
         if #matches > 0 then
-            longestmatch = #pattern
+            last_match = pattern
         end
 
         if #matches == 0 and not next then
-            match_and_show(pattern:sub(0, longestmatch), pattern:sub(longestmatch + 1))
+            match_and_show(pattern:sub(0, #last_match), pattern:sub(#last_match + 1))
             vim.cmd('redraw')
         end
 
@@ -317,6 +313,9 @@ function M._search()
 
     end
 
+    pattern = last_match
+    matches, next = visible_matches(pattern)
+
     if #matches == 0 then
         return
     end
@@ -324,8 +323,6 @@ function M._search()
     -- save search information for "n" compatibility and
     -- arrow up replay
     vim.fn.setreg("/", pattern)
-    M.last_search = pattern
-    M.last_search_longestmatch = longestmatch
 
     if #matches == 1 then
         local match = matches[1]
