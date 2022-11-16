@@ -164,21 +164,26 @@ local function getkey()
 
 end
 
-local function match_and_show(pat, cnt)
+local function match_and_show(head, tail)
     -- delete stale extmarks before drawing new ones
-    api.nvim_buf_clear_namespace(0, hint_ns, 0, -1)
-    local matches, next = visible_matches(pat)
+    local matches, next = visible_matches(head)
     local color = (#matches == 1) and "OnesearchSingle" or "OnesearchMulti"
+    if tail then
+        -- replace " " with "_" so that we see it better, space has no color >_>
+        tail = tail:gsub(" ", "_")
+    end
+    api.nvim_buf_clear_namespace(0, hint_ns, 0, -1)
     for _, match in ipairs(matches) do
-        api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1, {
-            virt_text = { { pat, color } },
-            virt_text_pos = "overlay"
+        local lnum = match.line - 1
+        local start_col = match.col - 1
+        local end_col = start_col + #head
+        api.nvim_buf_set_extmark(0, hint_ns, lnum, start_col, {
+            hl_group = color,
+            end_col = end_col
         })
-
-        if cnt then
-            api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1 + #pat, {
-                -- replace " " with "_" so that we see it better, space has no color >_>
-                virt_text = { { cnt:gsub(" ", "_"), M.conf.hl.error } },
+        if tail then
+            api.nvim_buf_set_extmark(0, hint_ns, lnum, end_col, {
+                virt_text = { { tail, M.conf.hl.error } },
                 virt_text_pos = "overlay"
             })
         end
