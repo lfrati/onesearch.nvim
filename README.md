@@ -5,7 +5,9 @@
 
 
 # onesearch.nvim
-> What is onesearch? Not his [highness of motion](https://github.com/easymotion/vim-easymotion) nor a mind bending [approach](https://github.com/ggandor/leap.nvim). This pony does one thing and one thing only: interactively searches for a pattern.
+> "Oh, sure, it can do anything you want." said the old man
+> 
+>  "As long as what you want is what it does."
 
 ## Why onesearch.nvim?
 Ever since I discovered plugins like [easymotion](https://github.com/easymotion/vim-easymotion) I've been in love with moving around selecting single char targets. With the advent of lua several new search plugins have appeared but despite their extensive configurability I couldn't get them to fit my specific use case. In particular I wanted it to:
@@ -69,11 +71,21 @@ While searching for a pattern, errors (i.e. chars that lead to no matches) are s
 
 Multiple matches  + errors         |  Single match   + errors           
 :-------------------------:|:-------------------------:
-<img width="345" alt="multi_error" src="https://user-images.githubusercontent.com/3115640/202078577-67a9b404-f8d8-4342-9887-d7d478fd9897.png"> | <img width="343" alt="single_error" src="https://user-images.githubusercontent.com/3115640/202078587-d319ad84-915d-46a8-9308-96a793d68e93.png">
+<img width="345" alt="multi_error" src="https://user-images.githubusercontent.com/3115640/202078577-67a9b404-f8d8-4342-9887-d7d478fd9897.png"> | <img width="345" alt="single_error" src="https://user-images.githubusercontent.com/3115640/202078587-d319ad84-915d-46a8-9308-96a793d68e93.png">
 
 You can delete the red character to resume searching. Also when a target is chosen the corresponding line flashes briefly. This is helpful in case of typos while selecting the target because it avoids losing track of the cursor.
 
 ![example](https://user-images.githubusercontent.com/3115640/202076941-2c018dc6-33a8-4001-9f99-c402a6ba099c.gif)
+
+## Extra goodies
+- populate `/` register : use `n` to quickly search for more matches ( see `:help quote_/` )
+- set ``` m` ``` : use ``` `` ``` or ``` '' ``` to go back where you came from ( see `:help mark-motions` )
+- up to 324 default hints : use pairs of hints to select from a large pool of matches, only when needed.
+
+Select first char        |  Select second char        
+:-------------------------:|:-------------------------:
+<img width="737" alt="CH1" src="https://user-images.githubusercontent.com/3115640/202332071-be69ea72-e88f-4984-8209-0079a4fe792a.png"> | <img width="739" alt="CH2" src="https://user-images.githubusercontent.com/3115640/202332109-04743a7d-43b0-46ef-941c-eed4d025eee3.png">
+ 
 
 ## Configuration
 What can I change?
@@ -90,6 +102,8 @@ require("onesearch").setup{
         select = "WarningMsg",        -- highlight for hints during target selection
         flash = "Search",             -- highlight for landing flash
         error = "WarningMsg",         -- highlight for no-matches flash
+        current_char = "DiffDelete",  -- highlight for char to be chosen from pair
+        other_char = "Normal",        -- highlight for other char in the pair
         prompt_empty = "Todo",        -- highlight for prompt upon empty search pattern
         prompt_matches = "Question",  -- highlight for default prompt
         prompt_nomatch = "ErrorMsg",  -- highlight for non-matching prompt
@@ -98,4 +112,4 @@ require("onesearch").setup{
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
 ```
-[^1]: Hints are applied top-to-bottom, beacuse when you tab around your cursor is set to the top one. There are 18 default chars. Too few? Refine your search more!
+[^1]: Hints are applied top-to-bottom, beacuse when you tab around your cursor is set to the top one.
