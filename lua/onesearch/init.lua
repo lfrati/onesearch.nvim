@@ -70,6 +70,16 @@ local function new_autotable(dim)
     return setmetatable({}, MT[1]);
 end
 
+local function make_pairs(hints)
+    local pairs = {}
+    for i = 1, #hints do
+        for j = 1, #hints do
+            pairs[#pairs + 1] = hints[i] .. hints[j]
+        end
+    end
+    return pairs
+end
+
 -- local function get_piece(lnum, start, stop)
 --     local line = vim.fn.getline(lnum)
 --     local chunk = line:sub(start, stop < #line and stop or #line)
@@ -193,17 +203,7 @@ local function match_and_show(head, tail)
     return matches, next
 end
 
-local function select_hint(targets)
-    local key = getkey()
-    local selected = targets[key]
-    if selected then
-        api.nvim_win_set_cursor(0, { selected.line, selected.col - 1 })
-        return true
-    end
-    return false
-end
-
-local function show_hints(matches)
+local function select_hint(matches)
     local targets = {}
     -- remove neon green hints to better see targets
     api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
@@ -217,7 +217,86 @@ local function show_hints(matches)
             })
         end
     end
-    return targets
+
+    vim.cmd("redraw")
+
+    local key = getkey()
+    local selected = targets[key]
+    if selected then
+        api.nvim_win_set_cursor(0, { selected.line, selected.col - 1 })
+        return true
+    end
+    return false
+end
+
+local function select_hints(matches)
+
+    local function get_chs(x) return x:sub(1, 1), x:sub(2, 2) end
+
+    local targets = new_autotable(2);
+    local seen = new_autotable(2);
+
+    -- remove neon green hints
+    api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
+    for i, match in ipairs(matches) do
+        local pair = M.conf.pairs[i]
+        local ch1, ch2 = get_chs(pair)
+        local row = seen[match.line]
+        if not row[match.col - 1] and not row[match.col + 1] then
+            row[match.col] = true
+            api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1, {
+                virt_text = { { ch1, M.conf.hl.current_char } },
+                virt_text_pos = "overlay",
+            })
+            api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col, {
+                virt_text = { { ch2, M.conf.hl.other_char } },
+                virt_text_pos = "overlay",
+            })
+            match.head = ch1
+            match.col = match.col + 1
+            targets[ch1][ch2] = match
+        else
+            print("duplicate")
+        end
+    end
+
+    vim.cmd("redraw")
+
+    local k1 = getkey()
+    local selected = targets[k1]
+
+    -- what an ugly way to check if a table is empty...
+    if next(selected) == nil then
+        return false -- pressed some random garbage
+    end
+
+    -- remove previous targets
+    api.nvim_buf_clear_namespace(0, hint_ns, 0, -1)
+    targets = {}
+    for c, match in pairs(selected) do
+        api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 2, {
+            virt_text = { { match.head, M.conf.hl.prev_char } },
+            virt_text_pos = "overlay",
+        })
+        api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1, {
+            virt_text = { { c, M.conf.hl.current_char } },
+            virt_text_pos = "overlay"
+        })
+        targets[c] = match
+    end
+
+    vim.cmd("redraw")
+
+    local k2 = getkey()
+    selected = targets[k2]
+
+    if selected then
+        api.nvim_win_set_cursor(0, { selected.line, selected.col - 2 })
+        return true
+    end
+
+    return false
+
 end
 
 --------------------------------------------------------------------------------
@@ -233,6 +312,9 @@ M.conf = {
         select = "WarningMsg",
         flash = "Search",
         error = "WarningMsg",
+        current_char = "DiffDelete",
+        other_char = "Normal",
+        prev_char = "Normal",
         prompt_empty = "Todo",
         prompt_matches = "Question",
         prompt_nomatch = "ErrorMsg",
@@ -240,10 +322,12 @@ M.conf = {
     prompt = ">>> Search: ",
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
+M.conf.pairs = make_pairs(M.conf.hints)
 M.last_search = ""
 
 function M.setup(user_conf)
     M.conf = vim.tbl_deep_extend("force", M.conf, user_conf or {})
+    M.conf.pairs = make_pairs(M.conf.hints)
 end
 
 -- from  https://github.com/phaazon/hop.nvim/blob/baa92e09ea2d3085bdf23c00ab378c1f27069f6f/lua/hop/init.lua#98
@@ -367,12 +451,15 @@ function M._search()
         return true
     end
 
-    if #matches > 1 then
-        local targets = show_hints(matches)
-        -- make sure to show the new hints
-        vim.cmd('redraw')
-        return select_hint(targets)
+    if #matches < #M.conf.hints then
+        return select_hint(matches)
     end
+
+    if #matches < #M.conf.pairs then
+        return select_hints(matches)
+    end
+
+    error("Bruh. Too many targets.")
 
     return false
 end
