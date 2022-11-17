@@ -255,8 +255,6 @@ local function select_hints(matches)
             match.head = ch1
             match.col = match.col + 1
             targets[ch1][ch2] = match
-        else
-            print("duplicate")
         end
     end
 
@@ -275,7 +273,7 @@ local function select_hints(matches)
     targets = {}
     for c, match in pairs(selected) do
         api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 2, {
-            virt_text = { { match.head, M.conf.hl.prev_char } },
+            virt_text = { { match.head, M.conf.hl.other_char } },
             virt_text_pos = "overlay",
         })
         api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1, {
@@ -314,7 +312,6 @@ M.conf = {
         error = "WarningMsg",
         current_char = "DiffDelete",
         other_char = "Normal",
-        prev_char = "Normal",
         prompt_empty = "Todo",
         prompt_matches = "Question",
         prompt_nomatch = "ErrorMsg",
