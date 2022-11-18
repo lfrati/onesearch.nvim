@@ -13,11 +13,36 @@ local background_ns = vim.api.nvim_create_namespace("OnesearchBackground")
 local flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
 
 if vim.o.termguicolors == true then -- fun gui colors :)
+    -- search
+    vim.api.nvim_set_hl(0, 'OnesearchOverlay', { fg = "#59717d", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#66ccff", bold = true })
+    -- flash
+    vim.api.nvim_set_hl(0, 'OnesearchFlash', { fg = "#d4d4d4", bg = "#613315", bold = true })
+    -- hint pairs
+    vim.api.nvim_set_hl(0, 'OnesearchCurrent', { fg = "#d4d4d4", bg = "#6f1313", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchOther', { fg = "#d4d4d4", bold = true })
+    -- colors
+    vim.api.nvim_set_hl(0, 'OnesearchGreen', { fg = "#69a955", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchYellow', { fg = "#d7ba7d", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchRed', { fg = "#f44747", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchBlue', { fg = "#569cd6", bold = true })
+
 else -- boring default colors :(
+    -- search
+    vim.api.nvim_set_hl(0, 'OnesearchOverlay', { link = "LineNr" })
     vim.api.nvim_set_hl(0, 'OnesearchMulti', { link = "Search" })
     vim.api.nvim_set_hl(0, 'OnesearchSingle', { link = "IncSearch" })
+    -- highlight
+    vim.api.nvim_set_hl(0, 'OnesearchFlash', { link = "Search" })
+    -- hint pairs
+    vim.api.nvim_set_hl(0, 'OnesearchCurrent', { link = "DiffDelete" })
+    vim.api.nvim_set_hl(0, 'OnesearchOther', { link = "Normal" })
+    -- colors
+    vim.api.nvim_set_hl(0, 'OnesearchGreen', { link = "Comment" })
+    vim.api.nvim_set_hl(0, 'OnesearchYellow', { link = "Todo" })
+    vim.api.nvim_set_hl(0, 'OnesearchRed', { link = "WarningMsg" })
+    vim.api.nvim_set_hl(0, 'OnesearchBlue', { link = "Question" })
 end
 
 --------------------------------------------------------------------------------
@@ -304,17 +329,17 @@ end
 M.conf = {
     flash_t = 150,
     hl = {
-        overlay = "LineNr",
+        overlay = "OnesearchOverlay",
         multi = "OnesearchMulti",
         single = "OnesearchSingle",
-        select = "WarningMsg",
-        flash = "Search",
-        error = "WarningMsg",
-        current_char = "DiffDelete",
-        other_char = "Normal",
-        prompt_empty = "Todo",
-        prompt_matches = "Question",
-        prompt_nomatch = "ErrorMsg",
+        select = "OnesearchRed",
+        flash = "OnesearchFlash",
+        error = "OnesearchRed",
+        current_char = "OnesearchCurrent",
+        other_char = "OnesearchOther",
+        prompt_empty = "OnesearchYellow",
+        prompt_matches = "OnesearchGreen",
+        prompt_nomatch = "OnesearchRed",
     },
     prompt = ">>> Search: ",
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
