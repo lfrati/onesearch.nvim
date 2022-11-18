@@ -72,29 +72,39 @@ Select first char        |  Select second char
 :-------------------------:|:-------------------------:
 <img width="737" alt="CH1" src="https://user-images.githubusercontent.com/3115640/202332071-be69ea72-e88f-4984-8209-0079a4fe792a.png"> | <img width="739" alt="CH2" src="https://user-images.githubusercontent.com/3115640/202332109-04743a7d-43b0-46ef-941c-eed4d025eee3.png">
 
-## 🚀 Configuration
+## 🛠 Configuration
 What can I change?
 - Don't like the default colors? Pick your own. 
 - Don't want flashes? Set flash_t to zero.
 - Don't like the chars used for hints? Provide your own[^1].
 ```lua
 require("onesearch").setup{
-    flash_t = 150,                    -- how long flash lasts upon landing, set to 0 for no flash
+    flash_t = 150,                         -- how long flash lasts upon landing, set to 0 for no flash
     hl = {
-        overlay = "NonText",          -- highlight for the background during search
-        multi = "OnesearchMulti",     -- highlight for multiple matches
-        single = "OnesearchSingle",   -- highlight for single match
-        select = "WarningMsg",        -- highlight for hints during target selection
-        flash = "Search",             -- highlight for landing flash
-        error = "WarningMsg",         -- highlight for no-matches flash
-        current_char = "DiffDelete",  -- highlight for char to be chosen from pair
-        other_char = "Normal",        -- highlight for other char in the pair
-        prompt_empty = "Todo",        -- highlight for prompt upon empty search pattern
-        prompt_matches = "Question",  -- highlight for default prompt
-        prompt_nomatch = "ErrorMsg",  -- highlight for non-matching prompt
+        overlay = "OnesearchOverlay",      -- highlight for the background during search
+        multi = "OnesearchMulti",          -- highlight for multiple matches
+        single = "OnesearchSingle",        -- highlight for single match
+        select = "OnesearchRed",           -- highlight for hints during target selection
+        flash = "OnesearchFlash",          -- highlight for landing flash
+        error = "OnesearchRed",            -- highlight for no-matches flash
+        current_char = "OnesearchCurrent", -- highlight for char to be chosen from pair
+        other_char = "OnesearchOther",     -- highlight for other char in the pair
+        prompt_empty = "OnesearchYellow",  -- highlight for prompt upon empty search pattern
+        prompt_matches = "OnesearchGreen", -- highlight for default prompt
+        prompt_nomatch = "OnesearchRed",   -- highlight for non-matching prompt
     },
-    prompt = ">>> Search: ",          -- prompt header
+    prompt = ">>> Search: ",               -- prompt header
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
 ```
+## 🚀 Similar Plugins
+Haven't found what you looked for? Maybe you'll have better luck with one of these:
+- [easymotion](https://github.com/easymotion/vim-easymotion)
+- [sneak](https://github.com/justinmk/vim-sneak)
+- [hop](https://github.com/phaazon/hop.nvim)
+- [leap](https://github.com/ggandor/leap.nvim)
+- [svart](https://gitlab.com/madyanov/svart.nvim/-/tree/master)
+- [sj](https://github.com/woosaaahh/sj.nvim)
+
+
 [^1]: Hints are applied top-to-bottom, beacuse when you tab around your cursor is set to the top one.
