@@ -244,7 +244,7 @@ local function select_hint(matches)
 
     -- can't be bothered to pick
     if key == M.K_CR then
-        key = next(targets)
+        key = M.conf.hints[1]
     end
 
     local selected = targets[key]
@@ -290,7 +290,7 @@ local function select_hints(matches)
 
     -- can't be bothered to pick
     if k1 == M.K_CR then
-        k1 = next(targets)
+        k1 = M.conf.hints[1]
     end
 
     local selected = targets[k1]
@@ -321,7 +321,7 @@ local function select_hints(matches)
 
     -- can't be bothered to pick
     if k2 == M.K_CR then
-        k2 = next(targets)
+        k2 = M.conf.hints[1]
     end
 
     selected = targets[k2]
@@ -447,7 +447,13 @@ local function search()
         end
     end
 
-    -- user pressed CR to accept
+    ------------------------------------------
+    -- from here the user pressed CR to accept
+    ------------------------------------------
+
+    -- if the user was lazy and pressed CR when there were errors ignore them >_>
+    pattern = last_match
+    matches, next = match_and_show(pattern)
 
     if #matches <= 0 then
         return false
@@ -456,7 +462,7 @@ local function search()
     -- :help quote_/
     -- Contains the most recent search-pattern.
     -- This is used for "n" and 'hlsearch'.
-    vim.fn.setreg("/", last_match)
+    vim.fn.setreg("/", pattern)
 
     if #matches == 1 then
         local match = matches[1]
