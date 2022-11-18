@@ -16,7 +16,7 @@ if vim.o.termguicolors == true then -- fun gui colors :)
     -- search
     vim.api.nvim_set_hl(0, 'OnesearchOverlay', { fg = "#59717d", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#66ccff", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#ffccff", bold = true })
     -- flash
     vim.api.nvim_set_hl(0, 'OnesearchFlash', { fg = "#d4d4d4", bg = "#613315", bold = true })
     -- hint pairs
@@ -241,6 +241,12 @@ local function select_hint(matches)
     vim.cmd("redraw")
 
     local key = getkey()
+
+    -- can't be bothered to pick
+    if key == M.K_CR then
+        key = next(targets)
+    end
+
     local selected = targets[key]
     if selected then
         api.nvim_win_set_cursor(0, { selected.line, selected.col - 1 })
@@ -281,6 +287,12 @@ local function select_hints(matches)
     vim.cmd("redraw")
 
     local k1 = getkey()
+
+    -- can't be bothered to pick
+    if k1 == M.K_CR then
+        k1 = next(targets)
+    end
+
     local selected = targets[k1]
 
     -- what an ugly way to check if a table is empty...
@@ -306,6 +318,12 @@ local function select_hints(matches)
     vim.cmd("redraw")
 
     local k2 = getkey()
+
+    -- can't be bothered to pick
+    if k2 == M.K_CR then
+        k2 = next(targets)
+    end
+
     selected = targets[k2]
 
     if selected then
