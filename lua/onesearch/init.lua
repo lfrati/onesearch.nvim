@@ -180,7 +180,7 @@ local function visible_matches(str)
     while (res.line > 0 --[[ matches found ]]
         and res.line >= visible.top --[[ match is visible ]]
         and res.line <= visible.bot --[[ match is visible ]]
-        and seen[res.line][res.col] == nil--[[ new match ]]
+        and not seen[res.line][res.col]--[[ new match ]]
         ) do
         seen[res.line][res.col] = true
         table.insert(matches, res)
@@ -365,6 +365,7 @@ local function search()
     local color = M.conf.hl.prompt_empty
     local last_match = ""
 
+    -- do the first dimming manually the others are handled by match_and_show
     dim(visible_lines())
 
     while (true) do
@@ -471,7 +472,8 @@ function M.search()
     local prev_guicursor = vim.o.guicursor
     vim.o.guicursor = "n:ver100"
 
-    local ok, retval = pcall(search)
+    local ok, retval = xpcall(search, debug.traceback)
+
     if not ok then
         api.nvim_echo({ { retval, 'Error' } }, true, {})
     end
