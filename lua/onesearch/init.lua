@@ -105,12 +105,6 @@ local function make_pairs(hints)
     return pairs
 end
 
--- local function get_piece(lnum, start, stop)
---     local line = vim.fn.getline(lnum)
---     local chunk = line:sub(start, stop < #line and stop or #line)
---     return chunk
--- end
-
 --------------------------------------------------------------------------------
 -- LOCAL STUFF
 --------------------------------------------------------------------------------
@@ -135,9 +129,9 @@ local function search_pos(pattern, mode)
     -- NOTE: moves cursor to match! need to save/restore
     local res
     if mode then
-        res = vim.fn.searchpos(pattern, mode)
+        res = vim.fn.searchpos([[\v]] .. pattern, mode)
     else
-        res = vim.fn.searchpos(pattern)
+        res = vim.fn.searchpos([[\v]] .. pattern)
     end
     return { line = res[1], col = res[2] }
 end
@@ -149,6 +143,30 @@ local function dim(visible)
     for lnum = visible.top - 1, visible.bot - 1 do
         vim.api.nvim_buf_add_highlight(0, background_ns, M.conf.hl.overlay, lnum, 0, -1)
     end
+end
+
+function M.lines_index(pattern)
+    local save_cursor = api.nvim_win_get_cursor(0) -- save location
+    local index = {};
+    local counter = 0;
+
+    -- Start searching from top
+    vim.fn.cursor({ 1, 1 })
+
+    local res = search_pos(pattern, "c")
+    while (res.line > 0--[[ matches found ]]
+        ) do
+        if not index[res.line] then
+            --[[ new matching line ]]
+            counter = counter + 1
+        end
+        index[res.line] = tostring(counter)
+        res = search_pos(pattern, "W")
+    end
+
+    api.nvim_win_set_cursor(0, save_cursor) -- restore location
+    index.total = tostring(counter)
+    return index
 end
 
 local function visible_matches(str)
@@ -203,21 +221,43 @@ end
 local function match_and_show(head, tail)
     -- delete stale extmarks before drawing new ones
     local matches, next = visible_matches(head)
-    local color = (#matches == 1) and "OnesearchSingle" or "OnesearchMulti"
+    local color = (#matches == 1) and M.conf.hl.single or M.conf.hl.multi
     if tail then
         -- replace " " with "_" so that we see it better, space has no color >_>
         tail = tail:gsub(" ", "_")
     end
+
+    local index = {}
+    if #head > 0 then
+        index = M.lines_index(head)
+    end
+    local marked_lines = {}
     api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
     for _, match in ipairs(matches) do
         local lnum = match.line - 1
         local start_col = match.col - 1
         local end_col = start_col + #head
+
+        -- local line_size = #vim.fn.getline(lnum + 1)
+        -- if line_size > 0 and end_col <= line_size then
         api.nvim_buf_set_extmark(0, match_ns, lnum, start_col, {
             hl_group = color,
             end_col = end_col,
 
         })
+        -- end
+
+        if index[lnum + 1] and not marked_lines[lnum] then
+            local ind = index[lnum + 1]
+            local msg = ind .. "/" .. index.total
+            local c = ind == index.total and M.conf.hl.index_last or M.conf.hl.index_notlast
+            api.nvim_buf_set_extmark(0, match_ns, lnum, 0, {
+                virt_text = { { msg, c } },
+                virt_text_pos = "eol",
+
+            })
+            marked_lines[lnum] = true
+        end
         if tail then
             api.nvim_buf_set_extmark(0, match_ns, lnum, end_col, {
                 virt_text = { { tail, M.conf.hl.error } },
@@ -340,6 +380,8 @@ M.conf = {
         prompt_empty = "OnesearchYellow",
         prompt_matches = "OnesearchGreen",
         prompt_nomatch = "OnesearchRed",
+        index_notlast = "OnesearchBlue",
+        index_last = "OnesearchRed",
     },
     prompt = ">>> Search: ",
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
@@ -397,6 +439,9 @@ local function search()
 
         else -- increase
             pattern = pattern .. key
+            -- if pattern == "&" then
+            --     pattern = ""
+            -- end
         end
 
         matches, next = match_and_show(pattern)
@@ -421,7 +466,6 @@ local function search()
         if #pattern > 0 and #matches == 0 then
             color = M.conf.hl.prompt_nomatch
         end
-
 
     end
 
