@@ -4,18 +4,18 @@
 </p>
 
 
-# onesearch.nvim
+# 🔎 onesearch.nvim
 > "Oh, sure, it can do anything you want." said the old man
 > 
 >  "As long as what you want is what it does."
 
-## Why onesearch.nvim?
+### Why onesearch.nvim?
 Ever since I discovered plugins like [easymotion](https://github.com/easymotion/vim-easymotion) I've been in love with moving around selecting single char targets. With the advent of lua several new search plugins have appeared but despite their extensive configurability I couldn't get them to fit my specific use case. In particular I wanted it to:
 - highlight visible matches and use TAB to look for more matches outside the visible range
 - visually show that there is a single match so that I don't have to scan the screen looking for more, and jump to it when I press CR
 - accept that I make mistakes and help me recover from them: show me the last valid match while I search and show me where I land so I don't lose track of the cursor when I mistype the target char
 
-## Installation
+## 📦 Installation
 
 Using [vim-plug](https://github.com/junegunn/vim-plug)
 
@@ -39,55 +39,40 @@ Using [packer](https://github.com/wbthomason/packer.nvim)
  end }
 ```
 
-## How it works
+## ⚙️ How it works
 
-Onesearch has only one main function `search()`, which dims the text on screen and starts an interactive string search. As you type the matches in the currently visible area are highlighted in green, if there is only a single match the color will change to light blue. 
+Onesearch has only one main function `search()`, which dims the text on screen and starts an interactive string search. As you type the matches in the currently visible area are highlighted, if there is only a single match the color will change. 
 
-Multiple matches           |  Single match             | Hints
+Single matche           |  Multiple matches             | Hints
 :-------------------------:|:-------------------------:|:-------------------------:
-<img width="310" alt="multi" src="https://user-images.githubusercontent.com/3115640/202079543-4f9ef5dd-ca3e-446e-84ef-9cf631163b22.png">   |  <img width="310" alt="single" src="https://user-images.githubusercontent.com/3115640/202079561-9bd3602f-2f17-4da1-8d8f-83120a104738.png"> | <img width="310" alt="hints" src="https://user-images.githubusercontent.com/3115640/202079575-927ebb48-8078-4973-8725-cb8be48898d2.png"> 
+<img width="363" alt="single" src="https://user-images.githubusercontent.com/3115640/202805162-24a428d5-af68-43bc-8896-8d9a0da5c7f8.png"> | <img width="366" alt="multiple" src="https://user-images.githubusercontent.com/3115640/202805039-cf8839a2-572f-4760-a059-6c73a21f84f9.png"> |  <img width="365" alt="targets" src="https://user-images.githubusercontent.com/3115640/202805101-c22eac31-645e-4171-b3cc-f08343ed8806.png">
 
-Pressing `<Tab>` will loop through groups of matches. Upon pressing `<CR>` the search ends and the jumping begins. The highlight changes to red, showing single char hints that can be used to jump to the matches. If there is only a single match visible it will jump immediately.
+Pressing `<Tab>` will loop through groups of matches (`<S-Tab>` will go back). Upon pressing `<CR>` the search ends and the jumping begins. The highlight changes to red, showing single char hints that can be used to jump to the matches. If there is only a single match visible it will jump immediately.
 
-```mermaid
-graph TD
-    A(START) -->|overlay| B(read char)
-    B -->|ESC| C(END)
-    subgraph pattern
-        B --> |char| E(grow) --> B
-        B --> |DEL| F(shrink) --> B 
-        F --> |empty + DEL| C
-        B -->|TAB| G(move view) --> B
-        B -->|ENTER| D{Accept}
-    end
-    subgraph marks
-        D --> |single match|J
-        D --> |multiple matches|H(read char)
-        H --> |char|J(JUMP)
-    end
-    H --> |ESC|C
-```
 While searching for a pattern, errors (i.e. chars that lead to no matches) are shown in red.
 
 Multiple matches  + errors         |  Single match   + errors           
 :-------------------------:|:-------------------------:
-<img width="345" alt="multi_error" src="https://user-images.githubusercontent.com/3115640/202078577-67a9b404-f8d8-4342-9887-d7d478fd9897.png"> | <img width="345" alt="single_error" src="https://user-images.githubusercontent.com/3115640/202078587-d319ad84-915d-46a8-9308-96a793d68e93.png">
+<img width="361" alt="multi_error" src="https://user-images.githubusercontent.com/3115640/202805900-55a31562-a93d-4e62-b3a0-cbb6deed9580.png"> | <img width="361" alt="single_errors" src="https://user-images.githubusercontent.com/3115640/202806029-fa438418-aa66-4ab7-b110-b9c4071a01dd.png">
 
-You can delete the red character to resume searching. Also when a target is chosen the corresponding line flashes briefly. This is helpful in case of typos while selecting the target because it avoids losing track of the cursor.
+You can delete all the errors with a single press of `<BS>` and continue searching. Also when a target is chosen the corresponding line flashes briefly. This is helpful in case of typos while selecting the target because it avoids losing track of the cursor.
 
-![example](https://user-images.githubusercontent.com/3115640/202076941-2c018dc6-33a8-4001-9f99-c402a6ba099c.gif)
+| Landing Flash  | S-Tab Flash |
+| ------------- | ------------- |
+| <video src="https://user-images.githubusercontent.com/3115640/202806932-80fce90e-4f46-4d0a-bebd-7f17e2687f3e.mov" controls>  | <video src="https://user-images.githubusercontent.com/3115640/202809030-5db6be9c-3cef-4103-b146-37e12bccb3bb.mov" controls>|
 
-## Extra goodies
+
+## 🎁 Extra goodies
 - populate `/` register : use `n` to quickly search for more matches ( see `:help quote_/` )
 - set ``` m` ``` : use ``` `` ``` or ``` '' ``` to go back where you came from ( see `:help mark-motions` )
+- embrace laziness: don't feel like deleting error? just `<CR>`! don't feel like picking char? just `<CR>`!
 - up to 324 default hints : use pairs of hints to select from a large pool of matches, only when needed.
 
 Select first char        |  Select second char        
 :-------------------------:|:-------------------------:
 <img width="737" alt="CH1" src="https://user-images.githubusercontent.com/3115640/202332071-be69ea72-e88f-4984-8209-0079a4fe792a.png"> | <img width="739" alt="CH2" src="https://user-images.githubusercontent.com/3115640/202332109-04743a7d-43b0-46ef-941c-eed4d025eee3.png">
- 
 
-## Configuration
+## 🚀 Configuration
 What can I change?
 - Don't like the default colors? Pick your own. 
 - Don't want flashes? Set flash_t to zero.
