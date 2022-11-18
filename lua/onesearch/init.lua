@@ -352,46 +352,9 @@ function M.setup(user_conf)
     M.conf.pairs = make_pairs(M.conf.hints)
 end
 
--- from  https://github.com/phaazon/hop.nvim/blob/baa92e09ea2d3085bdf23c00ab378c1f27069f6f/lua/hop/init.lua#98
-function M.search()
+local function search()
 
-    -- :help mark-motions
-    -- Set the previous context mark.  This can be jumped to with:
-    --      - '' go to the line
-    --      - `` go to the position
-    api.nvim_exec("normal! m`", false)
-
-    -- :help winsaveview()
-    -- This is useful if you have a mapping that jumps around in the
-    -- buffer and you want to go back to the original view.
-    local save_winview = vim.fn.winsaveview()
-    local prev_guicursor = vim.o.guicursor
-    vim.o.guicursor = "n:ver100"
-
-    local ok, retval = pcall(M._search)
-    if not ok then
-        api.nvim_echo({ { retval, 'Error' } }, true, {})
-    end
-
-    M.clear()
-    vim.o.guicursor = prev_guicursor
-
-    -- retval is true if jumped
-    --          false if aborted
-    if not retval then
-        vim.fn.winrestview(save_winview)
-        api.nvim_echo({ { "", 'Normal' } }, false, {})
-    else
-        if M.conf.flash_t > 0 then
-            local line = vim.fn.getpos(".")[2]
-            flash_line(line)
-        end
-    end
-end
-
-function M._search()
-
-    local K_Esc = api.nvim_replace_termcodes('<Esc>', true, false, true) -- you know who I am
+    local K_Esc = api.nvim_replace_termcodes('<Esc>', true, false, true)
     local K_BS = api.nvim_replace_termcodes('<BS>', true, false, true) -- backspace
     local K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
     local K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
@@ -424,7 +387,13 @@ function M._search()
             if #pattern == 0 then -- delete on empty pattern exits
                 return false
             end
-            pattern = pattern:sub(1, -2)
+
+            if #pattern > #last_match then -- there were errors, discard them
+                pattern = last_match
+            else
+                pattern = pattern:sub(1, -2)
+            end
+
         else -- increase
             pattern = pattern .. key
         end
@@ -484,6 +453,43 @@ function M._search()
     error("Bruh. Too many targets.")
 
     return false
+end
+
+-- from  https://github.com/phaazon/hop.nvim/blob/baa92e09ea2d3085bdf23c00ab378c1f27069f6f/lua/hop/init.lua#98
+function M.search()
+
+    -- :help mark-motions
+    -- Set the previous context mark.  This can be jumped to with:
+    --      - '' go to the line
+    --      - `` go to the position
+    api.nvim_exec("normal! m`", false)
+
+    -- :help winsaveview()
+    -- This is useful if you have a mapping that jumps around in the
+    -- buffer and you want to go back to the original view.
+    local save_winview = vim.fn.winsaveview()
+    local prev_guicursor = vim.o.guicursor
+    vim.o.guicursor = "n:ver100"
+
+    local ok, retval = pcall(search)
+    if not ok then
+        api.nvim_echo({ { retval, 'Error' } }, true, {})
+    end
+
+    M.clear()
+    vim.o.guicursor = prev_guicursor
+
+    -- retval is true if jumped
+    --          false if aborted
+    if not retval then
+        vim.fn.winrestview(save_winview)
+        api.nvim_echo({ { "", 'Normal' } }, false, {})
+    else
+        if M.conf.flash_t > 0 then
+            local line = vim.fn.getpos(".")[2]
+            flash_line(line)
+        end
+    end
 end
 
 function M.clear()
