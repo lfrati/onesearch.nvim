@@ -105,12 +105,6 @@ local function make_pairs(hints)
     return pairs
 end
 
--- local function get_piece(lnum, start, stop)
---     local line = vim.fn.getline(lnum)
---     local chunk = line:sub(start, stop < #line and stop or #line)
---     return chunk
--- end
-
 --------------------------------------------------------------------------------
 -- LOCAL STUFF
 --------------------------------------------------------------------------------
@@ -128,6 +122,7 @@ local function flash_line(lnum)
         M.conf.flash_t,
         vim.schedule_wrap(function()
             api.nvim_buf_del_extmark(0, flash_ns, flash_id)
+            vim.cmd("redraw")
         end))
 end
 
@@ -345,6 +340,11 @@ M.conf = {
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
 M.conf.pairs = make_pairs(M.conf.hints)
+M.K_Esc = api.nvim_replace_termcodes('<Esc>', true, false, true)
+M.K_BS = api.nvim_replace_termcodes('<BS>', true, false, true) -- backspace
+M.K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
+M.K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
+M.K_STAB = api.nvim_replace_termcodes('<S-Tab>', true, false, true)
 M.last_search = ""
 
 function M.setup(user_conf)
@@ -353,15 +353,10 @@ function M.setup(user_conf)
 end
 
 local function search()
-
-    local K_Esc = api.nvim_replace_termcodes('<Esc>', true, false, true)
-    local K_BS = api.nvim_replace_termcodes('<BS>', true, false, true) -- backspace
-    local K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
-    local K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
     local pattern = ''
 
-    local next = nil
-    local matches, key
+    local matches, key, next
+    local stack = {}
     local color = M.conf.hl.prompt_empty
     local last_match = ""
 
@@ -375,16 +370,23 @@ local function search()
 
         key = getkey()
 
-        if key == K_Esc then -- reject
+        if key == M.K_Esc then -- reject
             return false
-        elseif key == K_CR then
+        elseif key == M.K_CR then
             break -- accept
-        elseif key == K_TAB then -- next
+        elseif key == M.K_TAB then -- next
             if next then
+                table.insert(stack, vim.fn.winsaveview())
                 api.nvim_win_set_cursor(0, { next.line, next.col })
                 api.nvim_exec("normal! zt", false)
             end
-        elseif key == K_BS then -- decrease
+        elseif key == M.K_STAB then -- next
+            if #stack > 0 then
+                local prev = table.remove(stack)
+                vim.fn.winrestview(prev)
+                flash_line(prev.lnum)
+            end
+        elseif key == M.K_BS then -- decrease
             if #pattern == 0 then -- delete on empty pattern exits
                 return false
             end
@@ -401,17 +403,21 @@ local function search()
 
         matches, next = match_and_show(pattern)
 
+        -- the chosen patter is not visible but exists somewhere: go there
         if #matches == 0 and next then
             api.nvim_win_set_cursor(0, { next.line, next.col - 1 })
+            -- #matches > 0 since it contains the prev next
             matches, next = match_and_show(pattern)
         end
 
         if #matches > 0 then
             last_match = pattern
-        end
-
-        if #matches == 0 and not next then
-            match_and_show(pattern:sub(0, #last_match), pattern:sub(#last_match + 1))
+        else
+            -- #matches == 0
+            if not next then
+                -- either the pattern is empty or I have messed up something
+                match_and_show(pattern:sub(0, #last_match), pattern:sub(#last_match + 1))
+            end
         end
 
         color = M.conf.hl.prompt_empty
@@ -421,12 +427,9 @@ local function search()
         if #pattern > 0 and #matches == 0 then
             color = M.conf.hl.prompt_nomatch
         end
-
-
     end
 
-    pattern = last_match
-    matches, next = visible_matches(pattern)
+    -- user pressed CR to accept
 
     if #matches <= 0 then
         return false
@@ -435,7 +438,7 @@ local function search()
     -- :help quote_/
     -- Contains the most recent search-pattern.
     -- This is used for "n" and 'hlsearch'.
-    vim.fn.setreg("/", pattern)
+    vim.fn.setreg("/", last_match)
 
     if #matches == 1 then
         local match = matches[1]
