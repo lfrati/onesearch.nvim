@@ -65,7 +65,7 @@ You can delete all the errors with a single press of `<BS>` and continue searchi
 ## 🎁 Extra goodies
 - populate `/` register : use `n` to quickly search for more matches ( see `:help quote_/` )
 - set ``` m` ``` : use ``` `` ``` or ``` '' ``` to go back where you came from ( see `:help mark-motions` )
-- embrace laziness: don't feel like deleting error? just `<CR>`! don't feel like picking char? just `<CR>`!
+- embrace laziness: don't feel like deleting errors? just `<CR>`! don't feel like picking char? just `<CR>`!
 - up to 324 default hints : use pairs of hints to select from a large pool of matches, only when needed.
 
 Select first char        |  Select second char        
