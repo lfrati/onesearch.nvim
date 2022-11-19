@@ -1,6 +1,12 @@
 local M = {}
 
 --------------------------------------------------------------------------------
+-- WARNING: 99% of the complexity and the pain in this code comes from figuring
+--          out if values should be 1-indexed or 0-indexed or (1,0)-indexed,
+--          yeah, (1,0), that's a thing. :help nvim_win_get_cursor()
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
 -- CONF
 --------------------------------------------------------------------------------
 
@@ -49,6 +55,21 @@ end
 -- UTILS
 --------------------------------------------------------------------------------
 
+local memo = {}
+setmetatable(memo, { __mode = "v" })
+-- from https://www.lua.org/pil/17.1.html
+-- no matter how many matches I'll make 1 getline call per visible line at max
+-- also memoize the results per search "session"
+local function get_line(lnum)
+    if memo[lnum] then -- result available?
+        return memo[lnum] -- reuse it
+    else
+        local res = vim.fn.getline(lnum)
+        memo[lnum] = res -- save for later reuse
+        return res
+    end
+end
+
 -- from :help uv.new_timer()
 local function set_timeout(timeout, callback)
     local timer = uv.new_timer()
@@ -65,9 +86,9 @@ local function lpad(str, len, char)
     return str .. string.rep(char or " ", len - #str)
 end
 
-local function get_whole_line(lnum)
+local function mask_line(lnum)
     local winwidth = vim.fn.winwidth(0)
-    local line = vim.fn.getline(lnum)
+    local line = get_line(lnum)
     local mask = lpad(line, winwidth, " ")
     return mask
 end
@@ -77,6 +98,12 @@ local function visible_lines()
         top = vim.fn.line("w0"),
         bot = vim.fn.line("w$")
     }
+end
+
+local function get_piece(lnum, start, stop)
+    local line = get_line(lnum)
+    local chunk = line:sub(start, stop < #line and stop or #line)
+    return chunk
 end
 
 local function new_autotable(dim)
@@ -99,10 +126,18 @@ local function make_pairs(hints)
     local pairs = {}
     for i = 1, #hints do
         for j = 1, #hints do
-            pairs[#pairs + 1] = hints[i] .. hints[j]
+            table.insert(pairs, { hints[i], hints[j] })
         end
     end
     return pairs
+end
+
+local function getkey()
+    local key = vim.fn.getchar()
+    if type(key) == 'number' then
+        key = vim.fn.nr2char(key)
+    end
+    return key
 end
 
 --------------------------------------------------------------------------------
@@ -113,10 +148,10 @@ local function flash_line(lnum)
     -- I sometimes mistype the jump location and I have then to look for
     -- where my cursor went. I'm gonna make the landing line flash to
     -- help me find it more easily.
-    local mask = get_whole_line(lnum)
+    local mask = mask_line(lnum)
     local flash_id = api.nvim_buf_set_extmark(0, flash_ns, lnum - 1, 0, {
         virt_text = { { mask, M.conf.hl.flash } },
-        virt_text_pos = "overlay",
+        virt_text_pos = "overlay"
     })
     set_timeout(
         M.conf.flash_t,
@@ -127,39 +162,49 @@ local function flash_line(lnum)
 end
 
 local function search_pos(pattern, mode)
-    -- NOTE: moves cursor to match! need to save/restore
-    local res
+    -- NOTE: moves cursor to the match unless mode contains "c"!
+    --       This is intented behaviour because the next calls are
+    --       going to start from there.
+
+    local escaped = vim.fn.escape(pattern, '\\/.$^~[]*')
+
+    local lnum, col
     if mode then
-        res = vim.fn.searchpos(pattern, mode)
+        lnum, col = unpack(vim.fn.searchpos(escaped, mode))
     else
-        res = vim.fn.searchpos(pattern)
+        lnum, col = unpack(vim.fn.searchpos(escaped))
     end
-    return { line = res[1], col = res[2] }
+
+    return {
+        head = get_piece(lnum, col, col + #pattern - 1),
+        line = lnum - 1,
+        start_col = col - 1,
+        end_col = col - 1 + #pattern
+    }
 end
 
 local function dim(visible)
     -- hide highlights, make everything grey.
-
     api.nvim_buf_clear_namespace(0, background_ns, 0, -1)
     for lnum = visible.top - 1, visible.bot - 1 do
         vim.api.nvim_buf_add_highlight(0, background_ns, M.conf.hl.overlay, lnum, 0, -1)
     end
 end
 
-local function visible_matches(str)
+local function visible_matches(head, tail)
     -- there are 4 options
     --   1. some matches are visible :  #matches >  0 , next != nil
     --   2.   no matches are visible :  #mathces == 0 , next != nil
     --   3.  all matches are visible :  #matches >  0 , next == nil
     --   4.   no matches             :  #matches == 0 , next == nil
 
-    local save_cursor = api.nvim_win_get_cursor(0) -- save location
-
-    local visible = visible_lines()
-    dim(visible)
+    tail = tail or ""
 
     local matches = {}
     local seen = new_autotable(2);
+    local save_cursor = api.nvim_win_get_cursor(0) -- save location
+    local visible = visible_lines()
+    dim(visible)
 
     -- Start searching from first visible line
     vim.fn.cursor({ visible.top, 1 })
@@ -170,52 +215,44 @@ local function visible_matches(str)
     -- The flag "c" lets you accept matches AT cursor position, but that means
     -- that the cursor doesn't move to new matches.
     -- To avoid getting stuck in place I only use "c" on the first search
+    -- TEST: lllllllllllllllllllllll  should only highlight every third l
 
-    local res = search_pos(str, "c")
-    while (res.line > 0 --[[ matches found ]]
-        and res.line >= visible.top --[[ match is visible ]]
-        and res.line <= visible.bot --[[ match is visible ]]
-        and not seen[res.line][res.col]--[[ new match ]]
+    local res = search_pos(head, "c")
+    while (res.line >= 0 --[[ matches found ]]
+        and res.line + 1 >= visible.top --[[ match is visible ]]
+        and res.line + 1 <= visible.bot --[[ match is visible ]]
+        and not seen[res.line][res.start_col]--[[ new match ]]
         ) do
-        seen[res.line][res.col] = true
-        table.insert(matches, res)
-        res = search_pos(str)
+        res.tail = tail -- add the tail information
+        -- consecutive matches make double hints a mess, we don't need them anyways
+        if not seen[res.line][res.start_col - 1]
+            and not seen[res.line][res.start_col - 2] then
+            seen[res.line][res.start_col] = true
+            table.insert(matches, res)
+        end
+        res = search_pos(head)
     end
-
     api.nvim_win_set_cursor(0, save_cursor) -- restore location
-    return matches, res.col > 0 and res or nil
+
+    local color_head = (#matches == 1) and "OnesearchSingle" or "OnesearchMulti"
+    return matches, res.start_col >= 0 and res or nil, color_head
 end
 
-local function getkey()
-    local key = vim.fn.getchar()
-
-    if type(key) == 'number' then
-        key = vim.fn.nr2char(key)
-    end
-    return key
-end
-
-local function match_and_show(head, tail)
+local function show(matches, color_head, color_tail)
+    color_head = color_head or "Normal"
+    color_tail = color_tail or "Normal"
     -- delete stale extmarks before drawing new ones
-    local matches, next = visible_matches(head)
-    local color = (#matches == 1) and "OnesearchSingle" or "OnesearchMulti"
-    if tail then
-        -- replace " " with "_" so that we see it better, space has no color >_>
-        tail = tail:gsub(" ", "_")
-    end
+
     api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
     for _, match in ipairs(matches) do
-        local lnum = match.line - 1
-        local start_col = match.col - 1
-        local end_col = start_col + #head
-        api.nvim_buf_set_extmark(0, match_ns, lnum, start_col, {
-            hl_group = color,
-            end_col = end_col,
-
+        api.nvim_buf_set_extmark(0, match_ns, match.line, match.start_col, {
+            virt_text = { { match.head, color_head } },
+            virt_text_pos = "overlay"
         })
-        if tail then
-            api.nvim_buf_set_extmark(0, match_ns, lnum, end_col, {
-                virt_text = { { tail, M.conf.hl.error } },
+
+        if #match.tail > 0 then
+            api.nvim_buf_set_extmark(0, match_ns, match.line, match.end_col, {
+                virt_text = { { match.tail, color_tail } },
                 virt_text_pos = "overlay"
             })
         end
@@ -223,116 +260,23 @@ local function match_and_show(head, tail)
     return matches, next
 end
 
-local function select_hint(matches)
-    local targets = {}
-    -- remove neon green hints to better see targets
-    api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
-    for i, match in ipairs(matches) do
-        if i < #M.conf.hints then
-            local c = M.conf.hints[i]
-            targets[c] = match
-            api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1, {
-                virt_text = { { c, M.conf.hl.select } },
-                virt_text_pos = "overlay"
-            })
-        end
-    end
-
+local function select(matches, color_head, color_tail, match_key)
+    show(matches, color_head, color_tail)
     vim.cmd("redraw")
 
     local key = getkey()
-
-    -- can't be bothered to pick
-    if key == M.K_CR then
+    if key == M.K_CR then -- can't be bothered to pick
         key = M.conf.hints[1]
     end
 
-    local selected = targets[key]
-    if selected then
-        api.nvim_win_set_cursor(0, { selected.line, selected.col - 1 })
-        return true
-    end
-    return false
-end
-
-local function select_hints(matches)
-
-    local function get_chs(x) return x:sub(1, 1), x:sub(2, 2) end
-
-    local targets = new_autotable(2);
-    local seen = new_autotable(2);
-
-    -- remove neon green hints
-    api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
-    for i, match in ipairs(matches) do
-        local pair = M.conf.pairs[i]
-        local ch1, ch2 = get_chs(pair)
-        local row = seen[match.line]
-        if not row[match.col - 1] and not row[match.col + 1] then
-            row[match.col] = true
-            api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1, {
-                virt_text = { { ch1, M.conf.hl.current_char } },
-                virt_text_pos = "overlay",
-            })
-            api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col, {
-                virt_text = { { ch2, M.conf.hl.other_char } },
-                virt_text_pos = "overlay",
-            })
-            match.head = ch1
-            match.col = match.col + 1
-            targets[ch1][ch2] = match
+    local remaining = {}
+    for _, match in ipairs(matches) do
+        if match[match_key] == key then
+            table.insert(remaining, match)
         end
     end
 
-    vim.cmd("redraw")
-
-    local k1 = getkey()
-
-    -- can't be bothered to pick
-    if k1 == M.K_CR then
-        k1 = M.conf.hints[1]
-    end
-
-    local selected = targets[k1]
-
-    -- what an ugly way to check if a table is empty...
-    if next(selected) == nil then
-        return false -- pressed some random garbage
-    end
-
-    -- remove previous targets
-    api.nvim_buf_clear_namespace(0, hint_ns, 0, -1)
-    targets = {}
-    for c, match in pairs(selected) do
-        api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 2, {
-            virt_text = { { match.head, M.conf.hl.other_char } },
-            virt_text_pos = "overlay",
-        })
-        api.nvim_buf_set_extmark(0, hint_ns, match.line - 1, match.col - 1, {
-            virt_text = { { c, M.conf.hl.current_char } },
-            virt_text_pos = "overlay"
-        })
-        targets[c] = match
-    end
-
-    vim.cmd("redraw")
-
-    local k2 = getkey()
-
-    -- can't be bothered to pick
-    if k2 == M.K_CR then
-        k2 = M.conf.hints[1]
-    end
-
-    selected = targets[k2]
-
-    if selected then
-        api.nvim_win_set_cursor(0, { selected.line, selected.col - 2 })
-        return true
-    end
-
-    return false
-
+    return remaining
 end
 
 --------------------------------------------------------------------------------
@@ -348,7 +292,7 @@ M.conf = {
         select = "OnesearchRed",
         flash = "OnesearchFlash",
         error = "OnesearchRed",
-        current_char = "OnesearchCurrent",
+        current_char = "OnesearchRed",
         other_char = "OnesearchOther",
         prompt_empty = "OnesearchYellow",
         prompt_matches = "OnesearchGreen",
@@ -364,6 +308,8 @@ M.K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
 M.K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
 M.K_STAB = api.nvim_replace_termcodes('<S-Tab>', true, false, true)
 M.last_search = ""
+M.debug = false
+M.debug_info = nil
 
 function M.setup(user_conf)
     M.conf = vim.tbl_deep_extend("force", M.conf, user_conf or {})
@@ -373,7 +319,7 @@ end
 local function search()
     local pattern = ''
 
-    local matches, key, next
+    local matches, key, next, color_head
     local stack = {}
     local color = M.conf.hl.prompt_empty
     local last_match = ""
@@ -395,14 +341,16 @@ local function search()
         elseif key == M.K_TAB then -- next
             if next then
                 table.insert(stack, vim.fn.winsaveview())
-                api.nvim_win_set_cursor(0, { next.line, next.col })
+                api.nvim_win_set_cursor(0, { next.line + 1, next.end_col })
                 api.nvim_exec("normal! zt", false)
             end
         elseif key == M.K_STAB then -- next
             if #stack > 0 then
                 local prev = table.remove(stack)
                 vim.fn.winrestview(prev)
-                flash_line(prev.lnum)
+                if M.conf.flash_t > 0 then
+                    flash_line(prev.lnum)
+                end
             end
         elseif key == M.K_BS then -- decrease
             if #pattern == 0 then -- delete on empty pattern exits
@@ -419,13 +367,15 @@ local function search()
             pattern = pattern .. key
         end
 
-        matches, next = match_and_show(pattern)
+        matches, next, color_head = visible_matches(pattern)
+        show(matches, color_head)
 
         -- the chosen patter is not visible but exists somewhere: go there
         if #matches == 0 and next then
-            api.nvim_win_set_cursor(0, { next.line, next.col - 1 })
+            api.nvim_win_set_cursor(0, { next.line + 1, next.start_col })
             -- #matches > 0 since it contains the prev next
-            matches, next = match_and_show(pattern)
+            matches, next, color_head = visible_matches(pattern)
+            show(matches, color_head)
         end
 
         if #matches > 0 then
@@ -434,7 +384,9 @@ local function search()
             -- #matches == 0
             if not next then
                 -- either the pattern is empty or I have messed up something
-                match_and_show(pattern:sub(0, #last_match), pattern:sub(#last_match + 1))
+                local tail = pattern:sub(#last_match + 1):gsub(" ", "_")
+                matches, next, color_head = visible_matches(last_match, tail)
+                show(matches, color_head, M.conf.hl.error)
             end
         end
 
@@ -453,7 +405,8 @@ local function search()
 
     -- if the user was lazy and pressed CR when there were errors ignore them >_>
     pattern = last_match
-    matches, next = match_and_show(pattern)
+    matches, next = visible_matches(pattern)
+    show(matches)
 
     if #matches <= 0 then
         return false
@@ -466,25 +419,48 @@ local function search()
 
     if #matches == 1 then
         local match = matches[1]
-        api.nvim_win_set_cursor(0, { match.line, match.col - 1 })
-        return true
+        return { match.line + 1, match.start_col }
     end
 
     if #matches < #M.conf.hints then
-        return select_hint(matches)
+        for i, match in ipairs(matches) do
+            match.head = ""
+            match.end_col = match.start_col
+            match.tail = M.conf.hints[i]
+        end
+        local selected = select(matches, "Normal", M.conf.hl.select, "tail")
+        if #selected == 1 then
+            return { selected[1].line + 1, selected[1].start_col }
+        end
+        return nil
     end
 
     if #matches < #M.conf.pairs then
-        return select_hints(matches)
+        for i, match in ipairs(matches) do
+            match.head = M.conf.pairs[i][1]
+            match.end_col = match.start_col + 1
+            match.tail = M.conf.pairs[i][2]
+        end
+        -- select first hint
+        matches = select(matches, M.conf.hl.current_char, M.conf.hl.other_char, "head")
+        if #matches <= 0 then
+            return nil
+        end
+        -- select second hint
+        local selected = select(matches, M.conf.hl.other_char, M.conf.hl.current_char, "tail")
+        if #selected == 1 then
+            return { selected[1].line + 1, selected[1].start_col }
+        end
+        return nil
     end
 
     error("Bruh. Too many targets.")
 
-    return false
+    return nil
 end
 
--- from  https://github.com/phaazon/hop.nvim/blob/baa92e09ea2d3085bdf23c00ab378c1f27069f6f/lua/hop/init.lua#98
 function M.search()
+    M.debug_info = nil
 
     -- :help mark-motions
     -- Set the previous context mark.  This can be jumped to with:
@@ -499,13 +475,17 @@ function M.search()
     local prev_guicursor = vim.o.guicursor
     vim.o.guicursor = "n:ver100"
 
-    local ok, retval = xpcall(search, debug.traceback)
+    local ok, retval = pcall(search)
 
     if not ok then
+        if M.debug then
+            print(vim.inspect(M.debug_info))
+        end
         api.nvim_echo({ { retval, 'Error' } }, true, {})
     end
 
     M.clear()
+    memo = {} -- clear memoized lines in get_lines
     vim.o.guicursor = prev_guicursor
 
     -- retval is true if jumped
@@ -514,6 +494,7 @@ function M.search()
         vim.fn.winrestview(save_winview)
         api.nvim_echo({ { "", 'Normal' } }, false, {})
     else
+        api.nvim_win_set_cursor(0, retval)
         if M.conf.flash_t > 0 then
             local line = vim.fn.getpos(".")[2]
             flash_line(line)
