@@ -107,8 +107,8 @@ graph TD
     B -->|ESC| C(END)
     subgraph pattern
         B --> |char| E(grow) --> B
-        B --> |DEL| F(shrink) --> B 
-        F --> |empty + DEL| C
+        B --> |BS| F(shrink) --> B 
+        F --> |empty + BS| C
         B -->|S?TAB| G(move view) --> B
         B -->|ENTER| D{Accept}
     end
