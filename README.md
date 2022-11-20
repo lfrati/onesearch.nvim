@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="400" src="https://raw.githubusercontent.com/lfrati/onesearch/main/assets/pony.jpeg">
+  <img width="300" src="https://raw.githubusercontent.com/lfrati/onesearch/main/assets/pony.jpeg">
    <p align="center"> The one-trick pony of searching.
 </p>
 
@@ -10,24 +10,21 @@
 >  "As long as what you want is what it does."
 
 ### Why onesearch.nvim?
-Ever since I discovered plugins like [easymotion](https://github.com/easymotion/vim-easymotion) I've been in love with moving around selecting single char targets. With the advent of lua several new search plugins have appeared but despite their extensive configurability I couldn't get them to fit my specific use case. In particular I wanted it to:
-- highlight visible matches and use TAB to look for more matches outside the visible range
-- visually show that there is a single match so that I don't have to scan the screen looking for more, and jump to it when I press CR
-- accept that I make mistakes and help me recover from them: show me the last valid match while I search and show me where I land so I don't lose track of the cursor when I mistype the target char
+Plugins like [easymotion](https://github.com/easymotion/vim-easymotion) make moving through text a pleasure. However, after trying [many different ones](#similar-plugins) I haven't found one that fits my needs perfectly. So I've decided to make it myself. 
+Features of onesearch include:
+- simplicity: the actual code is <400 lines in a single file. Feel free to take a look, there are comments too!
+- opinionated: no complex configuration needed. It doesn't try cover all your needs, but insted focus on one use case.
+- realistic: we are not machines (yet?), we make mistakes and mistype. Embracing that allows to recover quickly.
+- visual: control are simple but the interface is rich. Use color and simple animations to be clear about what's happening.
 
 ## 📦 Installation
+
+Requires `neovim >= 0.8`
 
 Using [vim-plug](https://github.com/junegunn/vim-plug)
 
 ```viml
 Plug 'lfrati/onesearch.nvim'
-  nmap / :lua require('onesearch').search()<CR>
-```
-
-Using [dein](https://github.com/Shougo/dein.vim)
-
-```viml
-call dein#add('lfrati/onesearch.nvim')
   nmap / :lua require('onesearch').search()<CR>
 ```
 
@@ -43,13 +40,13 @@ Using [packer](https://github.com/wbthomason/packer.nvim)
 
 Onesearch has only one main function `search()`, which dims the text on screen and starts an interactive string search. As you type the matches in the currently visible area are highlighted, if there is only a single match the color will change. 
 
-Single matche           |  Multiple matches             | Hints
+Single match           |  Multiple matches             | Hints
 :-------------------------:|:-------------------------:|:-------------------------:
 <img width="363" alt="single" src="https://user-images.githubusercontent.com/3115640/202805162-24a428d5-af68-43bc-8896-8d9a0da5c7f8.png"> | <img width="366" alt="multiple" src="https://user-images.githubusercontent.com/3115640/202805039-cf8839a2-572f-4760-a059-6c73a21f84f9.png"> |  <img width="365" alt="targets" src="https://user-images.githubusercontent.com/3115640/202805101-c22eac31-645e-4171-b3cc-f08343ed8806.png">
 
 Pressing `<Tab>` will loop through groups of matches (`<S-Tab>` will go back). Upon pressing `<CR>` the search ends and the jumping begins. The highlight changes to red, showing single char hints that can be used to jump to the matches. If there is only a single match visible it will jump immediately.
 
-While searching for a pattern, errors (i.e. chars that lead to no matches) are shown in red.
+While searching for a pattern, errors (i.e. chars that lead to no matches) are shown in red. Note: characters in the search patter are escaped so that every search is literal, no weird regex trickery, just good ol' strings of code.
 
 Multiple matches  + errors         |  Single match   + errors           
 :-------------------------:|:-------------------------:
@@ -58,7 +55,7 @@ Multiple matches  + errors         |  Single match   + errors
 You can delete all the errors with a single press of `<BS>` and continue searching. Also when a target is chosen the corresponding line flashes briefly. This is helpful in case of typos while selecting the target because it avoids losing track of the cursor.
 
 | Landing Flash  | S-Tab Flash |
-| ------------- | ------------- |
+| :-------------: | :-------------: |
 | <video src="https://user-images.githubusercontent.com/3115640/202806932-80fce90e-4f46-4d0a-bebd-7f17e2687f3e.mov" controls>  | <video src="https://user-images.githubusercontent.com/3115640/202809030-5db6be9c-3cef-4103-b146-37e12bccb3bb.mov" controls>|
 
 
@@ -97,7 +94,30 @@ require("onesearch").setup{
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
 ```
-## 🚀 Similar Plugins
+
+## 🏗️ Design
+The design of onesearch revolves around simplicity. No trying to decrypt arcane VimL incantations. Just some simple effective Lua. The plugin looks for matches in the visible lines plus one more match (if present) to guide forward searches. This means that the file size doesn't really matter, only your window size. This is also why we disable fancy broad regexes in favor of specific code strings. Hinting is also designed around simplicity. The same code used to show matches and errors, is used to show single or double hints (e.g. match -> hint1, errors -> hint2). Less code, less bugs, less confusion and less time needed to improve the experience. The plugin implements a simple finite state automata controlled by only 4 main keys: CR, BS, S-TAB, TAB.
+
+```mermaid
+graph TD
+    A(START) -->|overlay| B(read char)
+    B -->|ESC| C(END)
+    subgraph pattern
+        B --> |char| E(grow) --> B
+        B --> |DEL| F(shrink) --> B 
+        F --> |empty + DEL| C
+        B -->|S?TAB| G(move view) --> B
+        B -->|ENTER| D{Accept}
+    end
+    subgraph marks
+        D --> |single match|J
+        D --> |multiple matches|H(read char)
+        H --> |char|J(JUMP)
+    end
+    H --> |ESC|C
+```
+
+## Similar Plugins
 Haven't found what you looked for? Maybe you'll have better luck with one of these:
 - [easymotion](https://github.com/easymotion/vim-easymotion)
 - [sneak](https://github.com/justinmk/vim-sneak)
