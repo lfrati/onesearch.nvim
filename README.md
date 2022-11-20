@@ -16,7 +16,7 @@ Features of onesearch include:
 - simplicity: the actual code is <500 lines in a single file. Feel free to take a look, there are comments too!
 - opinionated: no complex configuration needed. It doesn't try cover all your needs, but insted focus on one use case.
 - realistic: we are not machines (yet?), we make mistakes and mistype. Embracing that allows to recover quickly.
-- visual: control are simple but the interface is rich. Use color and simple animations to be clear about what's happening.
+- visual: controls are simple (3 keys) but the interface is rich. Use color and simple animations to be clear about what's happening.
 
 ## 📦 Installation
 
@@ -99,7 +99,7 @@ require("onesearch").setup{
 ```
 
 ## 🏗️ Design
-The design of onesearch revolves around simplicity. No trying to decrypt arcane VimL incantations. Just some simple effective Lua. The plugin looks for matches in the visible lines plus one more match (if present) to guide forward searches. This means that the file size doesn't really matter, only your window size. This is also why we disable fancy broad regexes in favor of specific code strings. Hinting is also designed around simplicity. The same code used to show matches and errors, is used to show single or double hints (e.g. match -> hint1, errors -> hint2). Less code, less bugs, less confusion and less time needed to improve the experience. The plugin implements a simple finite state automata controlled by only 4 main keys: CR, BS, S-TAB, TAB.
+The design of onesearch revolves around simplicity. No trying to decrypt arcane VimL incantations. Just some simple effective Lua. The plugin looks for matches in the visible lines plus one more match (if present) to guide forward searches. This means that the file size doesn't really matter, only your window size. This is also why we disable fancy broad regexes in favor of specific code strings. Hinting is also designed around simplicity. The same code used to show matches and errors, is used to show single or double hints (e.g. match -> hint1, errors -> hint2). Less code, fewer bugs, less confusion and less time needed to improve the experience. The single search function offered (and actually exported) is wrapped in a pcall so that the cleanup will always take place. The plugin implements a simple finite state automata controlled by only 4 main keys: CR, BS, S-TAB, TAB.
 
 ```mermaid
 graph TD
