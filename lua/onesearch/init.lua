@@ -323,13 +323,14 @@ local function search()
     local stack = {}
     local color = M.conf.hl.prompt_empty
     local last_match = ""
+    local errors = ""
 
     -- do the first dimming manually the others are handled by match_and_show
     dim(visible_lines())
 
     while (true) do
 
-        api.nvim_echo({ { M.conf.prompt, color }, { pattern, "Normal" } }, false, {})
+        api.nvim_echo({ { M.conf.prompt, color }, { last_match, "Normal" }, { errors, "OnesearchRed" } }, false, {})
         vim.cmd("redraw")
 
         key = getkey()
@@ -380,12 +381,13 @@ local function search()
 
         if #matches > 0 then
             last_match = pattern
+            errors = ""
         else
             -- #matches == 0
             if not next then
                 -- either the pattern is empty or I have messed up something
-                local tail = pattern:sub(#last_match + 1):gsub(" ", "_")
-                matches, next, color_head = visible_matches(last_match, tail)
+                errors = pattern:sub(#last_match + 1):gsub(" ", "_")
+                matches, next, color_head = visible_matches(last_match, errors)
                 show(matches, color_head, M.conf.hl.error)
             end
         end
@@ -492,13 +494,14 @@ function M.search()
     --          false if aborted
     if not retval then
         vim.fn.winrestview(save_winview)
-        api.nvim_echo({ { "", 'Normal' } }, false, {})
+        api.nvim_echo({ { "Onesearch aborted.", 'Normal' } }, false, {})
     else
         api.nvim_win_set_cursor(0, retval)
         if M.conf.flash_t > 0 then
             local line = vim.fn.getpos(".")[2]
             flash_line(line)
         end
+        api.nvim_echo({ { "Jumped to match [" .. retval[1] .. "," .. retval[2] .. "]", 'Normal' } }, false, {})
     end
 end
 
