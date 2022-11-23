@@ -4,7 +4,8 @@
 </p>
 
 
-# 🔎 onesearch.nvim
+# 🔎 onesearch.nvim <img alt="LOC" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Flfrati%2Fonesearch.nvim%2Fdevelop%2Fassets%2Floc.json">
+
 > "Oh, sure, it can do anything you want." said the old man
 > 
 >  "As long as what you want is what it does."
