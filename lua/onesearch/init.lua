@@ -1,4 +1,8 @@
 local M = {}
+local api = vim.api
+local uv = vim.loop
+
+-- https://stevedonovan.github.io/ldoc/manual/doc.md.html
 
 --------------------------------------------------------------------------------
 -- WARNING: 99% of the complexity and the pain in this code comes from figuring
@@ -9,9 +13,6 @@ local M = {}
 --------------------------------------------------------------------------------
 -- CONF
 --------------------------------------------------------------------------------
-
-local api = vim.api
-local uv = vim.loop
 
 local hint_ns = vim.api.nvim_create_namespace("OnesearchHints")
 local match_ns = vim.api.nvim_create_namespace("OnesearchMatch")
@@ -161,6 +162,14 @@ local function flash_line(lnum)
         end))
 end
 
+--- Search for a pattern, after escaping it
+--  and return the first match
+-- @param pattern : string to be escaped and searched
+-- @param    mode : string to be passed to vim.fn.search_pos
+-- @return table containing the match info {head, line, start_col, end_col}
+-- @warning if the patter is not found lnum = 0 -> line < 0
+-- @warning search is performed from the current cursor position
+-- @usage search_pos(".ciao","cW")
 local function search_pos(pattern, mode)
     -- NOTE: moves cursor to the match unless mode contains "c"!
     --       This is intented behaviour because the next calls are
@@ -461,6 +470,39 @@ local function search()
     return nil
 end
 
+local VimContext = {
+    ["modes"] = {
+        ["o"] = {
+            ["guicursor"] = "n:ver100",
+            ["hlsearch"] = false
+        }
+    },
+    ["stored"] = {}
+}
+
+M.VimContext = VimContext
+
+function VimContext:install()
+    assert(next(self.stored) == nil, "Stored context is not empty. Installing again will overwrite it")
+    for mode, values in pairs(self.modes) do
+        self.stored[mode] = {}
+        for k, v in pairs(values) do
+            local tmp = vim[mode][k]
+            self.stored[mode][k] = tmp
+            vim[mode][k] = v
+        end
+    end
+end
+
+function VimContext:remove()
+    for mode, values in pairs(self.stored) do
+        for k, v in pairs(values) do
+            vim[mode][k] = v
+        end
+    end
+    self.stored = {}
+end
+
 function M.search()
     M.debug_info = nil
 
@@ -474,8 +516,8 @@ function M.search()
     -- This is useful if you have a mapping that jumps around in the
     -- buffer and you want to go back to the original view.
     local save_winview = vim.fn.winsaveview()
-    local prev_guicursor = vim.o.guicursor
-    vim.o.guicursor = "n:ver100"
+
+    VimContext:install()
 
     local ok, retval = pcall(search)
 
@@ -488,7 +530,8 @@ function M.search()
 
     M.clear()
     memo = {} -- clear memoized lines in get_lines
-    vim.o.guicursor = prev_guicursor
+
+    VimContext:remove()
 
     -- retval is true if jumped
     --          false if aborted
