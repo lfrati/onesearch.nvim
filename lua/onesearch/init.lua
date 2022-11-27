@@ -33,6 +33,7 @@ if vim.o.termguicolors == true then -- fun gui colors :)
     vim.api.nvim_set_hl(0, 'OnesearchGreen', { fg = "#69a955", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchYellow', { fg = "#d7ba7d", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchRed', { fg = "#f44747", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchOrange', { fg = "#ff9933", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchBlue', { fg = "#569cd6", bold = true })
 
 else -- boring default colors :(
@@ -233,6 +234,8 @@ local function visible_matches(head, tail)
         and not seen[res.line][res.start_col]--[[ new match ]]
         ) do
         res.tail = tail -- add the tail information
+        local match_type = M.get_identifier_type()
+        res.color_head = M.conf.ts[match_type]
         -- consecutive matches make double hints a mess, we don't need them anyways
         if not seen[res.line][res.start_col - 1]
             and not seen[res.line][res.start_col - 2] then
@@ -255,7 +258,7 @@ local function show(matches, color_head, color_tail)
     api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
     for _, match in ipairs(matches) do
         api.nvim_buf_set_extmark(0, match_ns, match.line, match.start_col, {
-            virt_text = { { match.head, color_head } },
+            virt_text = { { match.head, match.color_head or color_head } },
             virt_text_pos = "overlay"
         })
 
@@ -306,6 +309,10 @@ M.conf = {
         prompt_empty = "OnesearchYellow",
         prompt_matches = "OnesearchGreen",
         prompt_nomatch = "OnesearchRed",
+    },
+    ts = {
+        ["function_declaration"] = "OnesearchOrange",
+        ["variable_declaration"] = "OnesearchYellow",
     },
     prompt = ">>> Search: ",
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
@@ -363,7 +370,7 @@ local function search()
                 end
             end
         elseif key == M.K_BS then -- decrease
-            if #pattern == 0 then -- delete on empty pattern exits
+            if #pattern <= 1 then -- exit on empty pattern
                 return false
             end
 
@@ -550,8 +557,47 @@ end
 
 function M.clear()
     api.nvim_buf_clear_namespace(0, hint_ns, 0, -1)
+
     api.nvim_buf_clear_namespace(0, background_ns, 0, -1)
     api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
+
 end
+
+local ts_utils = nil
+
+local function is_var_decl(node)
+    local assignment = node:parent():parent()
+    local decl = assignment:parent()
+    -- print(assignment:type() == "assignment_statement")
+    -- print(decl:type() == "variable_declaration")
+    return assignment:type() == "assignment_statement" and
+        decl:type() == "variable_declaration"
+end
+
+function M.get_identifier_type()
+
+    if ts_utils == nil then
+
+        local ok, retval = pcall(function() return require "nvim-treesitter.ts_utils" end)
+
+        M.conf.ts_available = ok
+        if ok then
+            ts_utils = retval
+
+        end
+    end
+
+    if not M.conf.ts_available then
+        return ""
+    end
+
+    local node = ts_utils.get_node_at_cursor()
+
+    local ok, retval = pcall(is_var_decl, node)
+    return (ok and retval) and "variable_declaration"
+
+end
+
+vim.keymap.set("n", "<leader>x", ":lua require'onesearch'.get_identifier_type()<CR>")
 
 return M
