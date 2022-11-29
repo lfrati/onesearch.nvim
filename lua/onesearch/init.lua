@@ -167,7 +167,7 @@ end
 -- @param pattern : string to be escaped and searched
 -- @param    mode : string to be passed to vim.fn.search_pos
 -- @return table containing the match info {head, line, start_col, end_col}
--- @warning if the patter is not found lnum = 0 -> line < 0
+-- @warning if the pattern is not found lnum = 0 -> line < 0
 -- @warning search is performed from the current cursor position
 -- @usage search_pos(".ciao","cW")
 local function search_pos(pattern, mode)
@@ -363,7 +363,7 @@ local function search()
                 end
             end
         elseif key == M.K_BS then -- decrease
-            if #pattern == 0 then -- delete on empty pattern exits
+            if #pattern <= 1 then -- empty pattern exits
                 return false
             end
 
@@ -380,7 +380,7 @@ local function search()
         matches, next, color_head = visible_matches(pattern)
         show(matches, color_head)
 
-        -- the chosen patter is not visible but exists somewhere: go there
+        -- the chosen pattern is not visible but exists somewhere: go there
         if #matches == 0 and next then
             api.nvim_win_set_cursor(0, { next.line + 1, next.start_col })
             -- #matches > 0 since it contains the prev next
@@ -440,12 +440,21 @@ local function search()
             match.tail = M.conf.hints[i]
         end
         local selected = select(matches, "Normal", M.conf.hl.select, "tail")
+
+        -- if you mistype during single label selection we won't send you all the way back.
+        -- you wanted to be somewhere here, but fucked up. Let's leave you in the neighborhood.
+        if #selected == 0 then
+            return { matches[1].line + 1, matches[1].start_col }
+        end
+        -- yay you correctly selected a hint. Let's go there.
         if #selected == 1 then
             return { selected[1].line + 1, selected[1].start_col }
         end
         return nil
     end
 
+    -- TODO: I think there is no point in using the same "put you in the neighborhood" approach
+    --       for hint pairs since there is so many of them. Should we still do it?
     if #matches < #M.conf.pairs then
         for i, match in ipairs(matches) do
             match.head = M.conf.pairs[i][1]
