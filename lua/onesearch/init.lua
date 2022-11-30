@@ -34,6 +34,7 @@ if vim.o.termguicolors == true then -- fun gui colors :)
     vim.api.nvim_set_hl(0, 'OnesearchYellow', { fg = "#d7ba7d", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchRed', { fg = "#f44747", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchBlue', { fg = "#569cd6", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchOrange', { fg = "#ff9933", bold = true })
 
 else -- boring default colors :(
     -- search
@@ -243,7 +244,7 @@ local function visible_matches(head, tail)
     end
     api.nvim_win_set_cursor(0, save_cursor) -- restore location
 
-    local color_head = (#matches == 1) and "OnesearchSingle" or "OnesearchMulti"
+    local color_head = (#matches == 1) and M.conf.hl.single or M.conf.hl.multi
     return matches, res.start_col >= 0 and res or nil, color_head
 end
 
