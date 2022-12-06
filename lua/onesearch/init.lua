@@ -217,7 +217,11 @@ local function visible_matches(head, tail)
     dim(visible)
 
     -- Start searching from first visible line
-    vim.fn.cursor({ visible.top, 1 })
+    if visible.top > vim.o.scrolloff then
+        vim.fn.cursor({ visible.top + vim.o.scrolloff, 1 })
+    else
+        vim.fn.cursor({ visible.top, 1 })
+    end
 
     -- Storytime: the search() function in vim doesn't accept matches AT
     -- the cursor position. So when I move to the beginning of the visible
@@ -295,6 +299,7 @@ end
 
 M.conf = {
     flash_t = 150,
+    scrolloff = 5,
     hl = {
         overlay = "OnesearchOverlay",
         multi = "OnesearchMulti",
@@ -350,9 +355,13 @@ local function search()
         elseif key == M.K_CR then
             break -- accept
         elseif key == M.K_TAB then -- next
+            vim.o.scrolloff = M.conf.scrolloff
             if next then
                 table.insert(stack, vim.fn.winsaveview())
                 api.nvim_win_set_cursor(0, { next.line + 1, next.end_col })
+                if M.conf.alican_super_secret_functionality then
+                    flash_line(next.line + 1)
+                end
                 api.nvim_exec("normal! zt", false)
             end
         elseif key == M.K_STAB then -- next
@@ -484,7 +493,9 @@ local VimContext = {
     ["modes"] = {
         ["o"] = {
             ["guicursor"] = "n:ver100",
-            ["hlsearch"] = false
+            ["hlsearch"] = false,
+            ["cursorline"] = false,
+            ["scrolloff"] = 0
         }
     },
     ["stored"] = {}
@@ -504,7 +515,7 @@ function VimContext:install()
     end
 end
 
-function VimContext:remove()
+function VimContext:restore()
     for mode, values in pairs(self.stored) do
         for k, v in pairs(values) do
             vim[mode][k] = v
@@ -541,7 +552,7 @@ function M.search()
     M.clear()
     memo = {} -- clear memoized lines in get_lines
 
-    VimContext:remove()
+    VimContext:restore()
 
     -- retval is true if jumped
     --          false if aborted
