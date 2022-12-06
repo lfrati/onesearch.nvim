@@ -23,7 +23,7 @@ if vim.o.termguicolors == true then -- fun gui colors :)
     -- search
     vim.api.nvim_set_hl(0, 'OnesearchOverlay', { fg = "#59717d", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#ffccff", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#000000", bg = "#7fef00", bold = true })
     -- flash
     vim.api.nvim_set_hl(0, 'OnesearchFlash', { fg = "#d4d4d4", bg = "#613315", bold = true })
     -- hint pairs
@@ -216,7 +216,9 @@ local function visible_matches(head, tail)
     local visible = visible_lines()
     dim(visible)
 
-    -- Start searching from first visible line
+    -- because of the scrolloff lines could be visible that contain
+    -- matches from previous iterations.
+    -- Ergo don't highligh in the scrolloff margin, unless it's the top of the file.
     if visible.top > vim.o.scrolloff then
         vim.fn.cursor({ visible.top + vim.o.scrolloff, 1 })
     else
@@ -355,6 +357,8 @@ local function search()
         elseif key == M.K_CR then
             break -- accept
         elseif key == M.K_TAB then -- next
+            -- when tabbing around don't show the top matches at the very top
+            -- of the file, it's not very readable
             vim.o.scrolloff = M.conf.scrolloff
             if next then
                 table.insert(stack, vim.fn.winsaveview())
