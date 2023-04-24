@@ -32,6 +32,7 @@ if vim.o.termguicolors == true then -- fun gui colors :)
     -- colors
     vim.api.nvim_set_hl(0, 'OnesearchGreen', { fg = "#69a955", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchYellow', { fg = "#d7ba7d", bold = true })
+    vim.api.nvim_set_hl(0, 'OnesearchOrange', { fg = "#ff9900", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchRed', { fg = "#f44747", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchBlue', { fg = "#569cd6", bold = true })
     vim.api.nvim_set_hl(0, 'OnesearchOrange', { fg = "#ff9933", bold = true })
@@ -347,7 +348,7 @@ local function search()
 
     while (true) do
 
-        api.nvim_echo({ { M.conf.prompt, color }, { last_match, "Normal" }, { errors, "OnesearchRed" } }, false, {})
+        api.nvim_echo({ { M.conf.prompt, color }, { last_match, "Normal" }, { errors, M.conf.hl.error } }, false, {})
         vim.cmd("redraw")
 
         key = getkey()
