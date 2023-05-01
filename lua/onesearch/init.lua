@@ -19,6 +19,7 @@ local match_ns = vim.api.nvim_create_namespace("OnesearchMatch")
 local background_ns = vim.api.nvim_create_namespace("OnesearchBackground")
 local flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
 
+
 -- from https://jdhao.github.io/2020/09/22/highlight_groups_cleared_in_nvim/
 -- some colorschemes can clear existing highlights >_>
 -- to make sure our colors works we set them every time search is started
