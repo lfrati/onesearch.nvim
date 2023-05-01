@@ -13,7 +13,7 @@
 ### Why onesearch.nvim?
 Plugins like [easymotion](https://github.com/easymotion/vim-easymotion) make moving through text a pleasure. However, after trying [many different ones](#similar-plugins) I haven't found one that fits my needs perfectly. So I've decided to make it myself. 
 Features of onesearch include:
-- simplicity: the actual code is <400 lines in a single file. Feel free to take a look, there are comments too!
+- simplicity: the actual code is <500 lines in a single file. Feel free to take a look, there are comments too!
 - opinionated: no complex configuration needed. It doesn't try cover all your needs, but insted focus on one use case.
 - realistic: we are not machines (yet?), we make mistakes and mistype. Embracing that allows to recover quickly.
 - visual: controls are simple (3 keys) but the interface is rich. Use color and simple animations to be clear about what's happening.
@@ -65,6 +65,7 @@ You can delete all the errors with a single press of `<BS>` and continue searchi
 - set ``` m` ``` : use ``` `` ``` or ``` '' ``` to go back where you came from ( see `:help mark-motions` )
 - embrace laziness: don't feel like deleting errors? just `<CR>`! don't feel like picking char? just `<CR>`!
 - up to 324 default hints : use pairs of hints to select from a large pool of matches, only when needed.
+- add customizable margin above top search to improve readability while tabbing
 
 Select first char        |  Select second char        
 :-------------------------:|:-------------------------:
@@ -78,6 +79,7 @@ What can I change?
 ```lua
 require("onesearch").setup{
     flash_t = 150,                         -- how long flash lasts upon landing, set to 0 for no flash
+    scrolloff = 5,                         -- margin to leave above top match while tabbing around
     hl = {
         overlay = "OnesearchOverlay",      -- highlight for the background during search
         multi = "OnesearchMulti",          -- highlight for multiple matches

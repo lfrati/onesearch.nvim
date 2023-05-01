@@ -1,4 +1,8 @@
 local M = {}
+local api = vim.api
+local uv = vim.loop
+
+-- https://stevedonovan.github.io/ldoc/manual/doc.md.html
 
 --------------------------------------------------------------------------------
 -- WARNING: 99% of the complexity and the pain in this code comes from figuring
@@ -10,75 +14,66 @@ local M = {}
 -- CONF
 --------------------------------------------------------------------------------
 
-local api = vim.api
-local uv = vim.loop
-
 local hint_ns = vim.api.nvim_create_namespace("OnesearchHints")
 local match_ns = vim.api.nvim_create_namespace("OnesearchMatch")
 local background_ns = vim.api.nvim_create_namespace("OnesearchBackground")
 local flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
 
-if vim.o.termguicolors == true then -- fun gui colors :)
-    -- search
-    vim.api.nvim_set_hl(0, 'OnesearchOverlay', { fg = "#59717d", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#ffccff", bold = true })
-    -- flash
-    vim.api.nvim_set_hl(0, 'OnesearchFlash', { fg = "#d4d4d4", bg = "#613315", bold = true })
-    -- hint pairs
-    vim.api.nvim_set_hl(0, 'OnesearchCurrent', { fg = "#d4d4d4", bg = "#6f1313", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchOther', { fg = "#d4d4d4", bold = true })
-    -- colors
-    vim.api.nvim_set_hl(0, 'OnesearchGreen', { fg = "#69a955", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchYellow', { fg = "#d7ba7d", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchOrange', { fg = "#ff9900", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchRed', { fg = "#f44747", bold = true })
-    vim.api.nvim_set_hl(0, 'OnesearchBlue', { fg = "#569cd6", bold = true })
 
-else -- boring default colors :(
-    -- search
-    vim.api.nvim_set_hl(0, 'OnesearchOverlay', { link = "LineNr" })
-    vim.api.nvim_set_hl(0, 'OnesearchMulti', { link = "Search" })
-    vim.api.nvim_set_hl(0, 'OnesearchSingle', { link = "IncSearch" })
-    -- highlight
-    vim.api.nvim_set_hl(0, 'OnesearchFlash', { link = "Search" })
-    -- hint pairs
-    vim.api.nvim_set_hl(0, 'OnesearchCurrent', { link = "DiffDelete" })
-    vim.api.nvim_set_hl(0, 'OnesearchOther', { link = "Normal" })
-    -- colors
-    vim.api.nvim_set_hl(0, 'OnesearchGreen', { link = "Comment" })
-    vim.api.nvim_set_hl(0, 'OnesearchYellow', { link = "Todo" })
-    vim.api.nvim_set_hl(0, 'OnesearchRed', { link = "WarningMsg" })
-    vim.api.nvim_set_hl(0, 'OnesearchBlue', { link = "Question" })
+-- from https://jdhao.github.io/2020/09/22/highlight_groups_cleared_in_nvim/
+-- some colorschemes can clear existing highlights >_>
+-- to make sure our colors works we set them every time search is started
+function M.set_colors()
+    if vim.o.termguicolors == true then -- fun gui colors :)
+        -- search
+        vim.api.nvim_set_hl(0, 'OnesearchOverlay', { fg = "#59717d", bold = true })
+        vim.api.nvim_set_hl(0, 'OnesearchMulti', { fg = "#7fef00", bold = true })
+        vim.api.nvim_set_hl(0, 'OnesearchSingle', { fg = "#000000", bg = "#7fef00", bold = true })
+        -- flash
+        vim.api.nvim_set_hl(0, 'OnesearchFlash', { fg = "#d4d4d4", bg = "#613315", bold = true })
+        -- hint pairs
+        vim.api.nvim_set_hl(0, 'OnesearchCurrent', { fg = "#d4d4d4", bg = "#6f1313", bold = true })
+        vim.api.nvim_set_hl(0, 'OnesearchOther', { fg = "#d4d4d4", bold = true })
+        -- colors
+        vim.api.nvim_set_hl(0, 'OnesearchGreen', { fg = "#69a955", bold = true })
+        vim.api.nvim_set_hl(0, 'OnesearchYellow', { fg = "#d7ba7d", bold = true })
+        vim.api.nvim_set_hl(0, 'OnesearchOrange', { fg = "#ff9900", bold = true })
+        vim.api.nvim_set_hl(0, 'OnesearchRed', { fg = "#f44747", bold = true })
+        vim.api.nvim_set_hl(0, 'OnesearchBlue', { fg = "#569cd6", bold = true })
+        vim.api.nvim_set_hl(0, 'OnesearchOrange', { fg = "#ff9933", bold = true })
+
+    else -- boring default colors :(
+        -- search
+        vim.api.nvim_set_hl(0, 'OnesearchOverlay', { link = "LineNr" })
+        vim.api.nvim_set_hl(0, 'OnesearchMulti', { link = "Search" })
+        vim.api.nvim_set_hl(0, 'OnesearchSingle', { link = "IncSearch" })
+        -- highlight
+        vim.api.nvim_set_hl(0, 'OnesearchFlash', { link = "Search" })
+        -- hint pairs
+        vim.api.nvim_set_hl(0, 'OnesearchCurrent', { link = "DiffDelete" })
+        vim.api.nvim_set_hl(0, 'OnesearchOther', { link = "Normal" })
+        -- colors
+        vim.api.nvim_set_hl(0, 'OnesearchGreen', { link = "Comment" })
+        vim.api.nvim_set_hl(0, 'OnesearchYellow', { link = "Todo" })
+        vim.api.nvim_set_hl(0, 'OnesearchRed', { link = "WarningMsg" })
+        vim.api.nvim_set_hl(0, 'OnesearchBlue', { link = "Question" })
+    end
 end
 
 --------------------------------------------------------------------------------
 -- UTILS
 --------------------------------------------------------------------------------
 
-local memo = {}
-setmetatable(memo, { __mode = "v" })
--- from https://www.lua.org/pil/17.1.html
--- no matter how many matches I'll make 1 getline call per visible line at max
--- also memoize the results per search "session"
-local function get_line(lnum)
-    if memo[lnum] then -- result available?
-        return memo[lnum] -- reuse it
-    else
-        local res = vim.fn.getline(lnum)
-        memo[lnum] = res -- save for later reuse
-        return res
-    end
-end
-
 -- from :help uv.new_timer()
 local function set_timeout(timeout, callback)
     local timer = uv.new_timer()
-    timer:start(timeout, 0, function()
-        timer:stop()
-        timer:close()
-        callback()
-    end)
+    if timer then
+        timer:start(timeout, 0, function()
+            timer:stop()
+            timer:close()
+            callback()
+        end)
+    end
     return timer
 end
 
@@ -89,7 +84,7 @@ end
 
 local function mask_line(lnum)
     local winwidth = vim.fn.winwidth(0)
-    local line = get_line(lnum)
+    local line = vim.fn.getline(lnum)
     local mask = lpad(line, winwidth, " ")
     return mask
 end
@@ -101,10 +96,10 @@ local function visible_lines()
     }
 end
 
-local function get_piece(lnum, start, stop)
-    local line = get_line(lnum)
-    local chunk = line:sub(start, stop < #line and stop or #line)
-    return chunk
+local function get_piece_between(lnum, start, stop)
+    local line = vim.fn.getline(lnum)
+    local piece = line:sub(start, stop < #line and stop or #line)
+    return piece
 end
 
 local function new_autotable(dim)
@@ -136,7 +131,7 @@ end
 local function getkey()
     local key = vim.fn.getchar()
     if type(key) == 'number' then
-        key = vim.fn.nr2char(key)
+        return vim.fn.nr2char(key)
     end
     return key
 end
@@ -162,6 +157,14 @@ local function flash_line(lnum)
         end))
 end
 
+--- Search for a pattern, after escaping it
+--  and return the first match
+-- @param pattern : string to be escaped and searched
+-- @param    mode : string to be passed to vim.fn.search_pos
+-- @return table containing the match info {head, line, start_col, end_col}
+-- @warning if the pattern is not found lnum = 0 -> line < 0
+-- @warning search is performed from the current cursor position
+-- @usage search_pos(".ciao","cW")
 local function search_pos(pattern, mode)
     -- NOTE: moves cursor to the match unless mode contains "c"!
     --       This is intented behaviour because the next calls are
@@ -177,7 +180,7 @@ local function search_pos(pattern, mode)
     end
 
     return {
-        head = get_piece(lnum, col, col + #pattern - 1),
+        head = get_piece_between(lnum, col, col + #pattern - 1),
         line = lnum - 1,
         start_col = col - 1,
         end_col = col - 1 + #pattern
@@ -207,8 +210,14 @@ local function visible_matches(head, tail)
     local visible = visible_lines()
     dim(visible)
 
-    -- Start searching from first visible line
-    vim.fn.cursor({ visible.top, 1 })
+    -- because of the scrolloff lines could be visible that contain
+    -- matches from previous iterations.
+    -- Ergo don't highligh in the scrolloff margin, unless it's the top of the file.
+    if visible.top > vim.o.scrolloff then
+        vim.fn.cursor({ visible.top + vim.o.scrolloff, 1 })
+    else
+        vim.fn.cursor({ visible.top, 1 })
+    end
 
     -- Storytime: the search() function in vim doesn't accept matches AT
     -- the cursor position. So when I move to the beginning of the visible
@@ -216,7 +225,6 @@ local function visible_matches(head, tail)
     -- The flag "c" lets you accept matches AT cursor position, but that means
     -- that the cursor doesn't move to new matches.
     -- To avoid getting stuck in place I only use "c" on the first search
-    -- TEST: lllllllllllllllllllllll  should only highlight every third l
 
     local res = search_pos(head, "c")
     while (res.line >= 0 --[[ matches found ]]
@@ -226,6 +234,7 @@ local function visible_matches(head, tail)
         ) do
         res.tail = tail -- add the tail information
         -- consecutive matches make double hints a mess, we don't need them anyways
+        -- TEST: lllllllllllllllllllllll  should only highlight every third l
         if not seen[res.line][res.start_col - 1]
             and not seen[res.line][res.start_col - 2] then
             seen[res.line][res.start_col] = true
@@ -240,8 +249,8 @@ local function visible_matches(head, tail)
 end
 
 local function show(matches, color_head, color_tail)
-    color_head = color_head or "Normal"
-    color_tail = color_tail or "Normal"
+    color_head = color_head or "Search"
+    color_tail = color_tail or "Search"
     -- delete stale extmarks before drawing new ones
 
     api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
@@ -266,7 +275,7 @@ local function select(matches, color_head, color_tail, match_key)
     vim.cmd("redraw")
 
     local key = getkey()
-    if key == M.K_CR then -- can't be bothered to pick
+    if key == M.K_CR then -- can't be bothered to pick, go to first one
         key = M.conf.hints[1]
     end
 
@@ -286,6 +295,7 @@ end
 
 M.conf = {
     flash_t = 150,
+    scrolloff = 5,
     hl = {
         overlay = "OnesearchOverlay",
         multi = "OnesearchMulti",
@@ -341,9 +351,15 @@ local function search()
         elseif key == M.K_CR then
             break -- accept
         elseif key == M.K_TAB then -- next
+            -- when tabbing around don't show the top matches at the very top
+            -- of the file, it's not very readable
+            vim.o.scrolloff = M.conf.scrolloff
             if next then
                 table.insert(stack, vim.fn.winsaveview())
                 api.nvim_win_set_cursor(0, { next.line + 1, next.end_col })
+                if M.conf.alican_super_secret_functionality then
+                    flash_line(next.line + 1)
+                end
                 api.nvim_exec("normal! zt", false)
             end
         elseif key == M.K_STAB then -- next
@@ -355,7 +371,7 @@ local function search()
                 end
             end
         elseif key == M.K_BS then -- decrease
-            if #pattern == 0 then -- delete on empty pattern exits
+            if #pattern <= 1 then -- empty pattern exits
                 return false
             end
 
@@ -372,7 +388,7 @@ local function search()
         matches, next, color_head = visible_matches(pattern)
         show(matches, color_head)
 
-        -- the chosen patter is not visible but exists somewhere: go there
+        -- the chosen pattern is not visible but exists somewhere: go there
         if #matches == 0 and next then
             api.nvim_win_set_cursor(0, { next.line + 1, next.start_col })
             -- #matches > 0 since it contains the prev next
@@ -432,12 +448,21 @@ local function search()
             match.tail = M.conf.hints[i]
         end
         local selected = select(matches, "Normal", M.conf.hl.select, "tail")
+
+        -- if you mistype during single label selection we won't send you all the way back.
+        -- you wanted to be somewhere here, but fucked up. Let's leave you in the neighborhood.
+        if #selected == 0 then
+            return { matches[1].line + 1, matches[1].start_col }
+        end
+        -- yay you correctly selected a hint. Let's go there.
         if #selected == 1 then
             return { selected[1].line + 1, selected[1].start_col }
         end
         return nil
     end
 
+    -- TODO: I think there is no point in using the same "put you in the neighborhood" approach
+    --       for hint pairs since there is so many of them. Should we still do it?
     if #matches < #M.conf.pairs then
         for i, match in ipairs(matches) do
             match.head = M.conf.pairs[i][1]
@@ -462,7 +487,42 @@ local function search()
     return nil
 end
 
+-- Some useful options that should be set while searching.
+M.VimContext = {
+    ["modes"] = {
+        ["o"] = {
+            ["guicursor"] = "n:ver100",
+            ["hlsearch"] = false,
+            ["cursorline"] = false,
+            ["scrolloff"] = 0
+        }
+    },
+    ["stored"] = {}
+}
+
+function M.VimContext:install()
+    assert(next(self.stored) == nil, "Stored context is not empty. Installing again will overwrite it")
+    for mode, values in pairs(self.modes) do
+        self.stored[mode] = {}
+        for k, v in pairs(values) do
+            local tmp = vim[mode][k]
+            self.stored[mode][k] = tmp
+            vim[mode][k] = v
+        end
+    end
+end
+
+function M.VimContext:restore()
+    for mode, values in pairs(self.stored) do
+        for k, v in pairs(values) do
+            vim[mode][k] = v
+        end
+    end
+    self.stored = {}
+end
+
 function M.search()
+    M.set_colors()
     M.debug_info = nil
 
     -- :help mark-motions
@@ -475,8 +535,8 @@ function M.search()
     -- This is useful if you have a mapping that jumps around in the
     -- buffer and you want to go back to the original view.
     local save_winview = vim.fn.winsaveview()
-    local prev_guicursor = vim.o.guicursor
-    vim.o.guicursor = "n:ver100"
+
+    M.VimContext:install()
 
     local ok, retval = pcall(search)
 
@@ -488,8 +548,7 @@ function M.search()
     end
 
     M.clear()
-    memo = {} -- clear memoized lines in get_lines
-    vim.o.guicursor = prev_guicursor
+    M.VimContext:restore()
 
     -- retval is true if jumped
     --          false if aborted
