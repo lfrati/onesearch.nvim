@@ -37,6 +37,13 @@ Using [packer](https://github.com/wbthomason/packer.nvim)
  end }
 ```
 
+Using [lazy](https://github.com/folke/lazy.nvim)
+```lua
+{ 'lfrati/onesearch.nvim', config = function()
+        vim.keymap.set("n", "/", ":lua require('onesearch').search()<CR>")
+end }
+```
+
 ## ⚙️ How it works
 
 Onesearch has only one main function `search()`, which dims the text on screen and starts an interactive string search. As you type the matches in the currently visible area are highlighted, if there is only a single match the color will change. 
