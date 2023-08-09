@@ -19,9 +19,16 @@ local match_ns = vim.api.nvim_create_namespace("OnesearchMatch")
 local background_ns = vim.api.nvim_create_namespace("OnesearchBackground")
 local flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
 
-
--- from https://jdhao.github.io/2020/09/22/highlight_groups_cleared_in_nvim/
--- some colorschemes can clear existing highlights >_>
+local function tableContains(table, item)
+    for _, value in ipairs(table) do
+        if value == item then
+            return true
+        end
+    end
+    return false
+end
+-- from https://jdhao.github.io/2020/09/22/highlight_grops_cleared_in_nvim/
+-- some cororschemes can clear existing highlights >_>
 -- to make sure our colors works we set them every time search is started
 function M.set_colors()
     if vim.o.termguicolors == true then -- fun gui colors :)
@@ -318,6 +325,8 @@ M.K_BS = api.nvim_replace_termcodes('<BS>', true, false, true) -- backspace
 M.K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
 M.K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
 M.K_STAB = api.nvim_replace_termcodes('<S-Tab>', true, false, true)
+M.K_UpArrow = api.nvim_replace_termcodes('<Up>', true, false, true)
+M.K_DownArrow = api.nvim_replace_termcodes('<Down>', true, false, true)
 M.last_search = ""
 M.debug = false
 M.debug_info = nil
@@ -327,8 +336,11 @@ function M.setup(user_conf)
     M.conf.pairs = make_pairs(M.conf.hints)
 end
 
+local last_searched_pattern = {}
+local current_search_index = 0
+
 local function search()
-    local pattern = ''
+    local pattern = ""
 
     local matches, key, next, color_head
     local stack = {}
@@ -349,6 +361,10 @@ local function search()
         if key == M.K_Esc then -- reject
             return false
         elseif key == M.K_CR then
+		if pattern ~= "" and not tableContains(last_searched_pattern, pattern) then
+            		last_searched_pattern[#last_searched_pattern+1] = pattern -- make a searching history
+	    		current_search_index = #last_searched_pattern
+		end
             break -- accept
         elseif key == M.K_TAB then -- next
             -- when tabbing around don't show the top matches at the very top
@@ -371,7 +387,7 @@ local function search()
                 end
             end
         elseif key == M.K_BS then -- decrease
-            if #pattern <= 1 then -- empty pattern exits
+            if #pattern < 1 then -- empty pattern exits
                 return false
             end
 
@@ -381,6 +397,18 @@ local function search()
                 pattern = pattern:sub(1, -2)
             end
 
+        elseif key == M.K_UpArrow then -- show last searched pattern
+            if current_search_index < 1 then
+                current_search_index = #last_searched_pattern
+            end
+            pattern = last_searched_pattern[current_search_index] or ""
+	    current_search_index = current_search_index - 1 -- show next last searched pattern
+        elseif key == M.K_DownArrow then -- show first searched pattern
+            if current_search_index > #last_searched_pattern then
+                current_search_index = 1
+            end
+            pattern = last_searched_pattern[current_search_index] or ""
+	    current_search_index = current_search_index + 1 -- show next search pattern
         else -- increase
             pattern = pattern .. key
         end
@@ -416,6 +444,7 @@ local function search()
         if #pattern > 0 and #matches == 0 then
             color = M.conf.hl.prompt_nomatch
         end
+
     end
 
     ------------------------------------------
