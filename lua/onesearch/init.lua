@@ -19,16 +19,9 @@ local match_ns = vim.api.nvim_create_namespace("OnesearchMatch")
 local background_ns = vim.api.nvim_create_namespace("OnesearchBackground")
 local flash_ns = vim.api.nvim_create_namespace("OnesearchFlash")
 
-local function tableContains(table, item)
-    for _, value in ipairs(table) do
-        if value == item then
-            return true
-        end
-    end
-    return false
-end
--- from https://jdhao.github.io/2020/09/22/highlight_grops_cleared_in_nvim/
--- some cororschemes can clear existing highlights >_>
+
+-- from https://jdhao.github.io/2020/09/22/highlight_groups_cleared_in_nvim/
+-- some colorschemes can clear existing highlights >_>
 -- to make sure our colors works we set them every time search is started
 function M.set_colors()
     if vim.o.termguicolors == true then -- fun gui colors :)
@@ -336,18 +329,15 @@ function M.setup(user_conf)
     M.conf.pairs = make_pairs(M.conf.hints)
 end
 
-local last_searched_pattern = {}
-local current_search_index = 0
-
 local function search()
-    local pattern = ""
+    local pattern = ''
 
     local matches, key, next, color_head
     local stack = {}
     local color = M.conf.hl.prompt_empty
     local last_match = ""
     local errors = ""
-
+    local search_index = 0
     -- do the first dimming manually the others are handled by match_and_show
     dim(visible_lines())
 
@@ -361,10 +351,7 @@ local function search()
         if key == M.K_Esc then -- reject
             return false
         elseif key == M.K_CR then
-		if pattern ~= "" and not tableContains(last_searched_pattern, pattern) then
-            		last_searched_pattern[#last_searched_pattern+1] = pattern -- make a searching history
-	    		current_search_index = #last_searched_pattern
-		end
+	    vim.fn.histadd("search", pattern)
             break -- accept
         elseif key == M.K_TAB then -- next
             -- when tabbing around don't show the top matches at the very top
@@ -397,18 +384,20 @@ local function search()
                 pattern = pattern:sub(1, -2)
             end
 
-        elseif key == M.K_UpArrow then -- show last searched pattern
-            if current_search_index < 1 then
-                current_search_index = #last_searched_pattern
-            end
-            pattern = last_searched_pattern[current_search_index] or ""
-	    current_search_index = current_search_index - 1 -- show next last searched pattern
+	elseif key == M.K_UpArrow then -- show last searched pattern
+	    search_index = search_index - 1 
+	    if search_index < -vim.fn.histnr("search") then
+	    	search_index = 0
+	    end 
+	    pattern = vim.fn.histget("search", search_index) or ""
+
         elseif key == M.K_DownArrow then -- show first searched pattern
-            if current_search_index > #last_searched_pattern then
-                current_search_index = 1
-            end
-            pattern = last_searched_pattern[current_search_index] or ""
-	    current_search_index = current_search_index + 1 -- show next search pattern
+	    search_index = search_index + 1
+	    if search_index > vim.fn.histnr("search") then
+		    search_index = 0
+	    end
+            pattern = vim.fn.histget("search", search_index) or ""
+
         else -- increase
             pattern = pattern .. key
         end
@@ -444,7 +433,6 @@ local function search()
         if #pattern > 0 and #matches == 0 then
             color = M.conf.hl.prompt_nomatch
         end
-
     end
 
     ------------------------------------------
