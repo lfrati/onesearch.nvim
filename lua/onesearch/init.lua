@@ -318,6 +318,8 @@ M.K_BS = api.nvim_replace_termcodes('<BS>', true, false, true) -- backspace
 M.K_CR = api.nvim_replace_termcodes('<CR>', true, false, true) -- enter
 M.K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
 M.K_STAB = api.nvim_replace_termcodes('<S-Tab>', true, false, true)
+M.K_UpArrow = api.nvim_replace_termcodes('<Up>', true, false, true)
+M.K_DownArrow = api.nvim_replace_termcodes('<Down>', true, false, true)
 M.last_search = ""
 M.debug = false
 M.debug_info = nil
@@ -335,7 +337,7 @@ local function search()
     local color = M.conf.hl.prompt_empty
     local last_match = ""
     local errors = ""
-
+    local search_index = 0
     -- do the first dimming manually the others are handled by match_and_show
     dim(visible_lines())
 
@@ -349,6 +351,7 @@ local function search()
         if key == M.K_Esc then -- reject
             return false
         elseif key == M.K_CR then
+	    vim.fn.histadd("search", pattern)
             break -- accept
         elseif key == M.K_TAB then -- next
             -- when tabbing around don't show the top matches at the very top
@@ -371,7 +374,7 @@ local function search()
                 end
             end
         elseif key == M.K_BS then -- decrease
-            if #pattern <= 1 then -- empty pattern exits
+            if #pattern < 1 then -- empty pattern exits
                 return false
             end
 
@@ -380,6 +383,20 @@ local function search()
             else
                 pattern = pattern:sub(1, -2)
             end
+
+	elseif key == M.K_UpArrow then -- show last searched pattern
+	    search_index = search_index - 1 
+	    if search_index < -vim.fn.histnr("search") then
+	    	search_index = 0
+	    end 
+	    pattern = vim.fn.histget("search", search_index) or ""
+
+        elseif key == M.K_DownArrow then -- show first searched pattern
+	    search_index = search_index + 1
+	    if search_index > vim.fn.histnr("search") then
+		    search_index = 0
+	    end
+            pattern = vim.fn.histget("search", search_index) or ""
 
         else -- increase
             pattern = pattern .. key
