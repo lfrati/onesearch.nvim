@@ -410,7 +410,7 @@ local function search()
             pattern = vim.fn.histget("search", search_index) or ""
 
 	elseif key == M.K_Paste then
-	    pattern = getClipboardText()
+	    pattern = pattern .. getClipboardText()
 
         else -- increase
             pattern = pattern .. key
