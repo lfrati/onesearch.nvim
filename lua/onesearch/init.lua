@@ -289,6 +289,16 @@ local function select(matches, color_head, color_tail, match_key)
     return remaining
 end
 
+local function getClipboardText()
+    local handle = io.popen("xclip -o", "r")
+    local text = handle and handle:read("*a")
+    if handle then
+    	handle:close()
+    end
+    return text
+end
+
+
 --------------------------------------------------------------------------------
 -- EXPORTED STUFF
 --------------------------------------------------------------------------------
@@ -320,6 +330,7 @@ M.K_TAB = api.nvim_replace_termcodes('<Tab>', true, false, true)
 M.K_STAB = api.nvim_replace_termcodes('<S-Tab>', true, false, true)
 M.K_UpArrow = api.nvim_replace_termcodes('<Up>', true, false, true)
 M.K_DownArrow = api.nvim_replace_termcodes('<Down>', true, false, true)
+M.K_Paste = api.nvim_replace_termcodes('<C-V>', true, false, true);
 M.last_search = ""
 M.debug = false
 M.debug_info = nil
@@ -397,6 +408,9 @@ local function search()
 		    search_index = 0
 	    end
             pattern = vim.fn.histget("search", search_index) or ""
+
+	elseif key == M.K_Paste then
+	    pattern = getClipboardText()
 
         else -- increase
             pattern = pattern .. key
