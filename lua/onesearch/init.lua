@@ -202,6 +202,13 @@ local function visible_matches(head, tail)
     --   3.  all matches are visible :  #matches >  0 , next == nil
     --   4.   no matches             :  #matches == 0 , next == nil
 
+    -- Storytime: unbeknownst to me, and afaik absent from vimdocs, vim.fn.searchpos()
+    --            defaults to searching the previous search if the pattern searched for
+    --            is ""... so I manually stop this nonsense by checking for it.
+    if #head <= 0 then
+        return {}, nil, M.conf.hl.multi
+    end
+
     tail = tail or ""
 
     local matches = {}
@@ -351,7 +358,6 @@ local function search()
         if key == M.K_Esc then -- reject
             return false
         elseif key == M.K_CR then
-	    vim.fn.histadd("search", pattern)
             break -- accept
         elseif key == M.K_TAB then -- next
             -- when tabbing around don't show the top matches at the very top
@@ -374,14 +380,14 @@ local function search()
                 end
             end
         elseif key == M.K_BS then -- decrease
-            if #pattern < 1 then -- empty pattern exits
-                return false
-            end
 
             if #pattern > #last_match then -- there were errors, discard them
                 pattern = last_match
             else
                 pattern = pattern:sub(1, -2)
+                if #pattern <= 0 then
+                    last_match = pattern
+                end
             end
 
 	elseif key == M.K_UpArrow then -- show last searched pattern
@@ -439,14 +445,13 @@ local function search()
     -- from here the user pressed CR to accept
     ------------------------------------------
 
-    -- if the user was lazy and pressed CR when there were errors ignore them >_>
-    pattern = last_match
-    matches, next = visible_matches(pattern)
-    show(matches)
-
     if #matches <= 0 then
         return false
     end
+
+    -- if the user was lazy and pressed CR when there were errors ignore them >_>
+    pattern = last_match
+    vim.fn.histadd("search", pattern)
 
     -- :help quote_/
     -- Contains the most recent search-pattern.
