@@ -73,6 +73,7 @@ You can delete all the errors with a single press of `<BS>` and continue searchi
 - embrace laziness: don't feel like deleting errors? just `<CR>`! don't feel like picking char? just `<CR>`!
 - up to 324 default hints : use pairs of hints to select from a large pool of matches, only when needed.
 - add customizable margin above top search to improve readability while tabbing
+- store previous searches and retrieve them with UP/DOWN (Thanks to [@Nithe14](https://github.com/Nithe14))
 
 Select first char        |  Select second char        
 :-------------------------:|:-------------------------:
