@@ -27,6 +27,7 @@ Using [vim-plug](https://github.com/junegunn/vim-plug)
 ```viml
 Plug 'lfrati/onesearch.nvim'
   nmap / :lua require('onesearch').search()<CR>
+  vmap / :<C-u>lua require('onesearch').visual_search()<CR>")
 ```
 
 Using [packer](https://github.com/wbthomason/packer.nvim)
@@ -34,13 +35,15 @@ Using [packer](https://github.com/wbthomason/packer.nvim)
 ```lua
  use { 'lfrati/onesearch.nvim', config = function()
         vim.keymap.set("n", "/", ":lua require('onesearch').search()<CR>")
- end }
+        vim.keymap.set("v", "/", ":<C-u>lua require('onesearch').visual_search()<CR>")
+end }
 ```
 
 Using [lazy](https://github.com/folke/lazy.nvim)
 ```lua
 { 'lfrati/onesearch.nvim', config = function()
         vim.keymap.set("n", "/", ":lua require('onesearch').search()<CR>")
+        vim.keymap.set("v", "/", ":<C-u>lua require('onesearch').visual_search()<CR>")
 end }
 ```
 
@@ -74,6 +77,7 @@ You can delete all the errors with a single press of `<BS>` and continue searchi
 - up to 324 default hints : use pairs of hints to select from a large pool of matches, only when needed.
 - add customizable margin above top search to improve readability while tabbing
 - store previous searches and retrieve them with UP/DOWN (Thanks to [@Nithe14](https://github.com/Nithe14))
+- pass text to start the search function (Thanks to [@Nithe14](https://github.com/Nithe14))
 
 Select first char        |  Select second char        
 :-------------------------:|:-------------------------:
