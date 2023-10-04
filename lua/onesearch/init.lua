@@ -41,7 +41,6 @@ function M.set_colors()
         vim.api.nvim_set_hl(0, 'OnesearchRed', { fg = "#f44747", bold = true })
         vim.api.nvim_set_hl(0, 'OnesearchBlue', { fg = "#569cd6", bold = true })
         vim.api.nvim_set_hl(0, 'OnesearchOrange', { fg = "#ff9933", bold = true })
-
     else -- boring default colors :(
         -- search
         vim.api.nvim_set_hl(0, 'OnesearchOverlay', { link = "LineNr" })
@@ -108,12 +107,14 @@ local function new_autotable(dim)
     -- so I'll use some metatable magic to make a pair -> seen mapping
     local MT = {};
     for i = 1, dim do
-        MT[i] = { __index = function(t, k)
-            if i < dim then
-                t[k] = setmetatable({}, MT[i + 1])
-                return t[k];
+        MT[i] = {
+            __index = function(t, k)
+                if i < dim then
+                    t[k] = setmetatable({}, MT[i + 1])
+                    return t[k];
+                end
             end
-        end }
+        }
     end
     return setmetatable({}, MT[1]);
 end
@@ -235,9 +236,9 @@ local function visible_matches(head, tail)
 
     local res = search_pos(head, "c")
     while (res.line >= 0 --[[ matches found ]]
-        and res.line + 1 >= visible.top --[[ match is visible ]]
-        and res.line + 1 <= visible.bot --[[ match is visible ]]
-        and not seen[res.line][res.start_col]--[[ new match ]]
+            and res.line + 1 >= visible.top --[[ match is visible ]]
+            and res.line + 1 <= visible.bot --[[ match is visible ]]
+            and not seen[res.line][res.start_col] --[[ new match ]]
         ) do
         res.tail = tail -- add the tail information
         -- consecutive matches make double hints a mess, we don't need them anyways
@@ -336,9 +337,8 @@ function M.setup(user_conf)
     M.conf.pairs = make_pairs(M.conf.hints)
 end
 
-local function search()
+local function search(seed)
     local pattern = ''
-
     local matches, key, next, color_head
     local stack = {}
     local color = M.conf.hl.prompt_empty
@@ -348,8 +348,21 @@ local function search()
     -- do the first dimming manually the others are handled by match_and_show
     dim(visible_lines())
 
-    while (true) do
+    -- when a seed is used for pattern we look for it in the text
+    -- if not found we mark the whole pattern as an error.
+    -- (if the seed does not exist in the text, shame on you ;p)
+    if seed and #seed > 0 then
+        matches, next, color_head = visible_matches(seed)
+        show(matches, color_head)
+        if #matches > 0 then
+            pattern = seed
+            last_match = seed
+        else
+            errors = seed
+        end
+    end
 
+    while (true) do
         api.nvim_echo({ { M.conf.prompt, color }, { last_match, "Normal" }, { errors, M.conf.hl.error } }, false, {})
         vim.cmd("redraw")
 
@@ -358,7 +371,7 @@ local function search()
         if key == M.K_Esc then -- reject
             return false
         elseif key == M.K_CR then
-            break -- accept
+            break                  -- accept
         elseif key == M.K_TAB then -- next
             -- when tabbing around don't show the top matches at the very top
             -- of the file, it's not very readable
@@ -379,31 +392,28 @@ local function search()
                     flash_line(prev.lnum)
                 end
             end
-        elseif key == M.K_BS then -- decrease
-
+        elseif key == M.K_BS then          -- decrease
             if #pattern > #last_match then -- there were errors, discard them
                 pattern = last_match
             else
                 pattern = pattern:sub(1, -2)
+                -- removes the last char left when pattern becomes ""
                 if #pattern <= 0 then
-                    last_match = pattern
+                    last_match = ""
                 end
             end
-
-	elseif key == M.K_UpArrow then -- show last searched pattern
-	    search_index = search_index - 1 
-	    if search_index < -vim.fn.histnr("search") then
-	    	search_index = 0
-	    end 
-	    pattern = vim.fn.histget("search", search_index) or ""
-
-        elseif key == M.K_DownArrow then -- show first searched pattern
-	    search_index = search_index + 1
-	    if search_index > vim.fn.histnr("search") then
-		    search_index = 0
-	    end
+        elseif key == M.K_UpArrow then -- show last searched pattern
+            search_index = search_index - 1
+            if search_index < -vim.fn.histnr("search") then
+                search_index = 0
+            end
             pattern = vim.fn.histget("search", search_index) or ""
-
+        elseif key == M.K_DownArrow then -- show first searched pattern
+            search_index = search_index + 1
+            if search_index > vim.fn.histnr("search") then
+                search_index = 0
+            end
+            pattern = vim.fn.histget("search", search_index) or ""
         else -- increase
             pattern = pattern .. key
         end
@@ -543,7 +553,25 @@ function M.VimContext:restore()
     self.stored = {}
 end
 
-function M.search()
+function M.get_visual_selection()
+    local s_start = vim.fn.getpos("'<")
+    local s_end = vim.fn.getpos("'>")
+    local n_lines = math.abs(s_end[2] - s_start[2]) + 1
+    local lines = vim.api.nvim_buf_get_lines(0, s_start[2] - 1, s_end[2], false)
+    lines[1] = string.sub(lines[1], s_start[3], -1)
+    if n_lines == 1 then
+        lines[n_lines] = string.sub(lines[n_lines], 1, s_end[3] - s_start[3] + 1)
+    else
+        lines[n_lines] = string.sub(lines[n_lines], 1, s_end[3])
+    end
+    return table.concat(lines, '\n')
+end
+
+function M.visual_search()
+    M.search(M.get_visual_selection())
+end
+
+function M.search(seed)
     M.set_colors()
     M.debug_info = nil
 
@@ -560,7 +588,7 @@ function M.search()
 
     M.VimContext:install()
 
-    local ok, retval = pcall(search)
+    local ok, retval = pcall(search, seed)
 
     if not ok then
         if M.debug then
