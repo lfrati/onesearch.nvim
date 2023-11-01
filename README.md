@@ -1,10 +1,9 @@
 <p align="center">
-  <img width="300" src="https://raw.githubusercontent.com/lfrati/onesearch/main/assets/pony.jpeg">
+  <img width="300" src="https://github.com/lfrati/onesearch.nvim/assets/3115640/d03d0365-c39a-4a71-84ec-d2dc5d3338e9">
    <p align="center"> The one-trick pony of searching.
 </p>
 
-
-# 🔎 onesearch.nvim <img alt="LOC" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Flfrati%2Fonesearch.nvim%2Fdevelop%2Fassets%2Floc.json">
+# 🔎 onesearch.nvim
 
 > "Oh, sure, it can do anything you want." said the old man
 > 
