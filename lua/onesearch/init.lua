@@ -1,6 +1,6 @@
 local M = {}
 local api = vim.api
-local uv = vim.loop
+-- local uv = vim.loop
 
 -- https://stevedonovan.github.io/ldoc/manual/doc.md.html
 
@@ -63,31 +63,6 @@ end
 -- UTILS
 --------------------------------------------------------------------------------
 
--- from :help uv.new_timer()
-local function set_timeout(timeout, callback)
-    local timer = uv.new_timer()
-    if timer then
-        timer:start(timeout, 0, function()
-            timer:stop()
-            timer:close()
-            callback()
-        end)
-    end
-    return timer
-end
-
--- is this seriously not a default string method?
-local function lpad(str, len, char)
-    return str .. string.rep(char or " ", len - #str)
-end
-
-local function mask_line(lnum)
-    local winwidth = vim.fn.winwidth(0)
-    local line = vim.fn.getline(lnum)
-    local mask = lpad(line, winwidth, " ")
-    return mask
-end
-
 local function visible_lines()
     return {
         top = vim.fn.line("w0"),
@@ -138,25 +113,49 @@ local function getkey()
 end
 
 --------------------------------------------------------------------------------
--- LOCAL STUFF
+-- RENDERING
 --------------------------------------------------------------------------------
 
-local function flash_line(lnum)
+local Renderer = {}
+
+function Renderer.flash_line(lnum)
     -- I sometimes mistype the jump location and I have then to look for
     -- where my cursor went. I'm gonna make the landing line flash to
     -- help me find it more easily.
-    local mask = mask_line(lnum)
-    local flash_id = api.nvim_buf_set_extmark(0, flash_ns, lnum - 1, 0, {
-        virt_text = { { mask, M.conf.hl.flash } },
-        virt_text_pos = "overlay"
-    })
-    set_timeout(
-        M.conf.flash_t,
-        vim.schedule_wrap(function()
-            api.nvim_buf_del_extmark(0, flash_ns, flash_id)
-            vim.cmd("redraw")
-        end))
+    vim.hl.range(0, flash_ns, M.conf.hl.flash, { lnum - 1, 0 }, { lnum - 1, -1 }, { timeout = M.conf.flash_t })
 end
+
+function Renderer.dim(visible)
+    -- hide previous highlights by overlaying the visible region.
+    api.nvim_buf_clear_namespace(0, background_ns, 0, -1)
+    vim.hl.range(0, background_ns, M.conf.hl.overlay, { visible.top - 1, 0 }, { visible.bot, -1 })
+end
+
+function Renderer.show(matches, color_head, color_tail)
+    color_head = color_head or "Search"
+    color_tail = color_tail or "Search"
+    -- delete stale extmarks before drawing new ones
+
+    api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
+    for _, match in ipairs(matches) do
+        api.nvim_buf_set_extmark(0, match_ns, match.line, match.start_col, {
+            virt_text = { { match.head, color_head } },
+            virt_text_pos = "overlay"
+        })
+
+        if #match.tail > 0 then
+            api.nvim_buf_set_extmark(0, match_ns, match.line, match.end_col, {
+                virt_text = { { match.tail, color_tail } },
+                virt_text_pos = "overlay"
+            })
+        end
+    end
+    return matches
+end
+
+--------------------------------------------------------------------------------
+-- LOCAL STUFF
+--------------------------------------------------------------------------------
 
 --- Search for a pattern, after escaping it
 --  and return the first match
@@ -188,14 +187,6 @@ local function search_pos(pattern, mode)
     }
 end
 
-local function dim(visible)
-    -- hide highlights, make everything grey.
-    api.nvim_buf_clear_namespace(0, background_ns, 0, -1)
-    for lnum = visible.top - 1, visible.bot - 1 do
-        vim.api.nvim_buf_add_highlight(0, background_ns, M.conf.hl.overlay, lnum, 0, -1)
-    end
-end
-
 local function visible_matches(head, tail)
     -- there are 4 options
     --   1. some matches are visible :  #matches >  0 , next != nil
@@ -216,7 +207,7 @@ local function visible_matches(head, tail)
     local seen = new_autotable(2);
     local save_cursor = api.nvim_win_get_cursor(0) -- save location
     local visible = visible_lines()
-    dim(visible)
+    Renderer.dim(visible)
 
     -- because of the scrolloff lines could be visible that contain
     -- matches from previous iterations.
@@ -256,30 +247,8 @@ local function visible_matches(head, tail)
     return matches, res.start_col >= 0 and res or nil, color_head
 end
 
-local function show(matches, color_head, color_tail)
-    color_head = color_head or "Search"
-    color_tail = color_tail or "Search"
-    -- delete stale extmarks before drawing new ones
-
-    api.nvim_buf_clear_namespace(0, match_ns, 0, -1)
-    for _, match in ipairs(matches) do
-        api.nvim_buf_set_extmark(0, match_ns, match.line, match.start_col, {
-            virt_text = { { match.head, color_head } },
-            virt_text_pos = "overlay"
-        })
-
-        if #match.tail > 0 then
-            api.nvim_buf_set_extmark(0, match_ns, match.line, match.end_col, {
-                virt_text = { { match.tail, color_tail } },
-                virt_text_pos = "overlay"
-            })
-        end
-    end
-    return matches, next
-end
-
 local function select(matches, color_head, color_tail, match_key)
-    show(matches, color_head, color_tail)
+    Renderer.show(matches, color_head, color_tail)
     vim.cmd("redraw")
 
     local key = getkey()
@@ -298,6 +267,146 @@ local function select(matches, color_head, color_tail, match_key)
 end
 
 --------------------------------------------------------------------------------
+-- SEARCH SESSION
+--------------------------------------------------------------------------------
+
+local SearchSession = {}
+SearchSession.__index = SearchSession
+
+function SearchSession.new(seed)
+    local self = setmetatable({
+        pattern = '',
+        last_match = '',
+        errors = '',
+        matches = {},
+        next_match = nil,
+        color_head = M.conf.hl.multi,
+        color = M.conf.hl.prompt_empty,
+        stack = {},
+        search_index = 0,
+    }, SearchSession)
+
+    Renderer.dim(visible_lines())
+
+    if seed and #seed > 0 then
+        self:apply_seed(seed)
+    else
+        self:update_prompt_color()
+    end
+
+    return self
+end
+
+function SearchSession:apply_seed(seed)
+    self.matches, self.next_match, self.color_head = visible_matches(seed)
+    Renderer.show(self.matches, self.color_head)
+
+    if #self.matches > 0 then
+        self.pattern = seed
+        self.last_match = seed
+        self.errors = ""
+    else
+        self.pattern = ''
+        self.last_match = ''
+        self.errors = seed
+    end
+
+    self:update_prompt_color()
+end
+
+function SearchSession:update_matches()
+    self.matches, self.next_match, self.color_head = visible_matches(self.pattern)
+    Renderer.show(self.matches, self.color_head)
+
+    if #self.matches == 0 and self.next_match then
+        api.nvim_win_set_cursor(0, { self.next_match.line + 1, self.next_match.start_col })
+        self.matches, self.next_match, self.color_head = visible_matches(self.pattern)
+        Renderer.show(self.matches, self.color_head)
+    end
+
+    if #self.matches > 0 then
+        self.last_match = self.pattern
+        self.errors = ""
+    elseif not self.next_match then
+        self.errors = self.pattern:sub(#self.last_match + 1):gsub(" ", "_")
+        self.matches, self.next_match, self.color_head = visible_matches(self.last_match, self.errors)
+        Renderer.show(self.matches, self.color_head, M.conf.hl.error)
+    end
+
+    self:update_prompt_color()
+end
+
+function SearchSession:update_prompt_color()
+    self.color = M.conf.hl.prompt_empty
+    if #self.pattern > 0 then
+        self.color = M.conf.hl.prompt_matches
+    end
+    if #self.pattern > 0 and #self.matches == 0 then
+        self.color = M.conf.hl.prompt_nomatch
+    end
+end
+
+function SearchSession:render_prompt()
+    api.nvim_echo({ { M.conf.prompt, self.color }, { self.last_match, "Normal" }, { self.errors, M.conf.hl.error } },
+        false, {})
+    vim.cmd("redraw")
+end
+
+function SearchSession:add_character(char)
+    self.pattern = self.pattern .. char
+end
+
+function SearchSession:backspace()
+    if #self.pattern > #self.last_match then
+        self.pattern = self.last_match
+    else
+        self.pattern = self.pattern:sub(1, -2)
+        if #self.pattern <= 0 then
+            self.last_match = ""
+        end
+    end
+end
+
+function SearchSession:history_prev()
+    self.search_index = self.search_index - 1
+    if self.search_index < -vim.fn.histnr("search") then
+        self.search_index = 0
+    end
+    self.pattern = vim.fn.histget("search", self.search_index) or ""
+end
+
+function SearchSession:history_next()
+    self.search_index = self.search_index + 1
+    if self.search_index > vim.fn.histnr("search") then
+        self.search_index = 0
+    end
+    self.pattern = vim.fn.histget("search", self.search_index) or ""
+end
+
+function SearchSession:jump_to_next_view()
+    vim.o.scrolloff = M.conf.scrolloff
+    if self.next_match then
+        table.insert(self.stack, vim.fn.winsaveview())
+        api.nvim_win_set_cursor(0, { self.next_match.line + 1, self.next_match.end_col })
+        if M.conf.alican_super_secret_functionality then
+            Renderer.flash_line(self.next_match.line + 1)
+        end
+        vim.cmd.normal({ bang = true, args = { "zt" } })
+    end
+end
+
+function SearchSession:jump_to_previous_view()
+    if #self.stack > 0 then
+        local prev = table.remove(self.stack)
+        vim.fn.winrestview(prev)
+        if M.conf.flash_t > 0 then
+            Renderer.flash_line(prev.lnum)
+        end
+    end
+end
+
+
+--------------------------------------------------------------------------------
 -- EXPORTED STUFF
 --------------------------------------------------------------------------------
 
@@ -311,13 +420,13 @@ M.conf = {
         select = "OnesearchRed",
         flash = "OnesearchFlash",
         error = "OnesearchRed",
-        current_char = "OnesearchRed",
+        current_char = "OnesearchCurrent",
         other_char = "OnesearchOther",
         prompt_empty = "OnesearchYellow",
         prompt_matches = "OnesearchGreen",
         prompt_nomatch = "OnesearchRed",
     },
-    prompt = ">>> Search: ",
+    prompt = "[DEV] >>> Search: ",
     hints = { "a", "s", "d", "f", "h", "j", "k", "l", "w", "e", "r", "u", "i", "o", "x", "c", "n", "m" }
 }
 M.conf.pairs = make_pairs(M.conf.hints)
@@ -338,116 +447,33 @@ function M.setup(user_conf)
 end
 
 local function search(seed)
-    local pattern = ''
-    local matches, key, next, color_head
-    local stack = {}
-    local color = M.conf.hl.prompt_empty
-    local last_match = ""
-    local errors = ""
-    local search_index = 0
-    -- do the first dimming manually the others are handled by match_and_show
-    dim(visible_lines())
+    local session = SearchSession.new(seed)
 
-    -- when a seed is used for pattern we look for it in the text
-    -- if not found we mark the whole pattern as an error.
-    -- (if the seed does not exist in the text, shame on you ;p)
-    if seed and #seed > 0 then
-        matches, next, color_head = visible_matches(seed)
-        show(matches, color_head)
-        if #matches > 0 then
-            pattern = seed
-            last_match = seed
-        else
-            errors = seed
-        end
-    end
+    while true do
+        session:render_prompt()
 
-    while (true) do
-        api.nvim_echo({ { M.conf.prompt, color }, { last_match, "Normal" }, { errors, M.conf.hl.error } }, false, {})
-        vim.cmd("redraw")
-
-        key = getkey()
+        local key = getkey()
 
         if key == M.K_Esc then -- reject
             return false
         elseif key == M.K_CR then
-            break                  -- accept
-        elseif key == M.K_TAB then -- next
-            -- when tabbing around don't show the top matches at the very top
-            -- of the file, it's not very readable
-            vim.o.scrolloff = M.conf.scrolloff
-            if next then
-                table.insert(stack, vim.fn.winsaveview())
-                api.nvim_win_set_cursor(0, { next.line + 1, next.end_col })
-                if M.conf.alican_super_secret_functionality then
-                    flash_line(next.line + 1)
-                end
-                api.nvim_exec("normal! zt", false)
-            end
-        elseif key == M.K_STAB then -- next
-            if #stack > 0 then
-                local prev = table.remove(stack)
-                vim.fn.winrestview(prev)
-                if M.conf.flash_t > 0 then
-                    flash_line(prev.lnum)
-                end
-            end
-        elseif key == M.K_BS then          -- decrease
-            if #pattern > #last_match then -- there were errors, discard them
-                pattern = last_match
-            else
-                pattern = pattern:sub(1, -2)
-                -- removes the last char left when pattern becomes ""
-                if #pattern <= 0 then
-                    last_match = ""
-                end
-            end
-        elseif key == M.K_UpArrow then -- show last searched pattern
-            search_index = search_index - 1
-            if search_index < -vim.fn.histnr("search") then
-                search_index = 0
-            end
-            pattern = vim.fn.histget("search", search_index) or ""
-        elseif key == M.K_DownArrow then -- show first searched pattern
-            search_index = search_index + 1
-            if search_index > vim.fn.histnr("search") then
-                search_index = 0
-            end
-            pattern = vim.fn.histget("search", search_index) or ""
-        else -- increase
-            pattern = pattern .. key
-        end
-
-        matches, next, color_head = visible_matches(pattern)
-        show(matches, color_head)
-
-        -- the chosen pattern is not visible but exists somewhere: go there
-        if #matches == 0 and next then
-            api.nvim_win_set_cursor(0, { next.line + 1, next.start_col })
-            -- #matches > 0 since it contains the prev next
-            matches, next, color_head = visible_matches(pattern)
-            show(matches, color_head)
-        end
-
-        if #matches > 0 then
-            last_match = pattern
-            errors = ""
+            break
+        elseif key == M.K_TAB then
+            session:jump_to_next_view()
+        elseif key == M.K_STAB then
+            session:jump_to_previous_view()
+        elseif key == M.K_BS then
+            session:backspace()
+        elseif key == M.K_UpArrow then
+            session:history_prev()
+        elseif key == M.K_DownArrow then
+            session:history_next()
         else
-            -- #matches == 0
-            if not next then
-                -- either the pattern is empty or I have messed up something
-                errors = pattern:sub(#last_match + 1):gsub(" ", "_")
-                matches, next, color_head = visible_matches(last_match, errors)
-                show(matches, color_head, M.conf.hl.error)
-            end
+            session:add_character(key)
         end
 
-        color = M.conf.hl.prompt_empty
-        if #pattern > 0 then
-            color = M.conf.hl.prompt_matches
-        end
-        if #pattern > 0 and #matches == 0 then
-            color = M.conf.hl.prompt_nomatch
+        if key ~= M.K_CR then
+            session:update_matches()
         end
     end
 
@@ -455,12 +481,12 @@ local function search(seed)
     -- from here the user pressed CR to accept
     ------------------------------------------
 
-    if #matches <= 0 then
+    if #session.matches <= 0 then
         return false
     end
 
     -- if the user was lazy and pressed CR when there were errors ignore them >_>
-    pattern = last_match
+    local pattern = session.last_match
     vim.fn.histadd("search", pattern)
 
     -- :help quote_/
@@ -468,23 +494,23 @@ local function search(seed)
     -- This is used for "n" and 'hlsearch'.
     vim.fn.setreg("/", pattern)
 
-    if #matches == 1 then
-        local match = matches[1]
+    if #session.matches == 1 then
+        local match = session.matches[1]
         return { match.line + 1, match.start_col }
     end
 
-    if #matches < #M.conf.hints then
-        for i, match in ipairs(matches) do
+    if #session.matches < #M.conf.hints then
+        for i, match in ipairs(session.matches) do
             match.head = ""
             match.end_col = match.start_col
             match.tail = M.conf.hints[i]
         end
-        local selected = select(matches, "Normal", M.conf.hl.select, "tail")
+        local selected = select(session.matches, "Normal", M.conf.hl.select, "tail")
 
         -- if you mistype during single label selection we won't send you all the way back.
         -- you wanted to be somewhere here, but fucked up. Let's leave you in the neighborhood.
         if #selected == 0 then
-            return { matches[1].line + 1, matches[1].start_col }
+            return { session.matches[1].line + 1, session.matches[1].start_col }
         end
         -- yay you correctly selected a hint. Let's go there.
         if #selected == 1 then
@@ -495,19 +521,19 @@ local function search(seed)
 
     -- TODO: I think there is no point in using the same "put you in the neighborhood" approach
     --       for hint pairs since there is so many of them. Should we still do it?
-    if #matches < #M.conf.pairs then
-        for i, match in ipairs(matches) do
+    if #session.matches < #M.conf.pairs then
+        for i, match in ipairs(session.matches) do
             match.head = M.conf.pairs[i][1]
             match.end_col = match.start_col + 1
             match.tail = M.conf.pairs[i][2]
         end
         -- select first hint
-        matches = select(matches, M.conf.hl.current_char, M.conf.hl.other_char, "head")
-        if #matches <= 0 then
+        local remaining = select(session.matches, M.conf.hl.current_char, M.conf.hl.other_char, "head")
+        if #remaining <= 0 then
             return nil
         end
         -- select second hint
-        local selected = select(matches, M.conf.hl.other_char, M.conf.hl.current_char, "tail")
+        local selected = select(remaining, M.conf.hl.other_char, M.conf.hl.current_char, "tail")
         if #selected == 1 then
             return { selected[1].line + 1, selected[1].start_col }
         end
@@ -579,7 +605,7 @@ function M.search(seed)
     -- Set the previous context mark.  This can be jumped to with:
     --      - '' go to the line
     --      - `` go to the position
-    api.nvim_exec("normal! m`", false)
+    vim.cmd.normal({ bang = true, args = { "m`" } })
 
     -- :help winsaveview()
     -- This is useful if you have a mapping that jumps around in the
@@ -600,8 +626,8 @@ function M.search(seed)
     M.clear()
     M.VimContext:restore()
 
-    -- retval is true if jumped
-    --          false if aborted
+    -- retval is { line, col } when we jumped
+    --          false or nil when we aborted
     if not retval then
         vim.fn.winrestview(save_winview)
         api.nvim_echo({ { "Onesearch aborted.", 'Normal' } }, false, {})
@@ -609,7 +635,7 @@ function M.search(seed)
         api.nvim_win_set_cursor(0, retval)
         if M.conf.flash_t > 0 then
             local line = vim.fn.getpos(".")[2]
-            flash_line(line)
+            Renderer.flash_line(line)
         end
         api.nvim_echo({ { "Jumped to match [" .. retval[1] .. "," .. retval[2] .. "]", 'Normal' } }, false, {})
     end
